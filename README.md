@@ -58,11 +58,12 @@ Projde archivy hry (`def.scs`, `locale.scs`, `dlc_*.scs`) a přepíše tři JSON
 
 Přepis `page/` do Vite + React + TS. Data čte z API (`api/`) po přihlášení, Vite na API přeposílá `/api`, aby přihlášení (cookie) bylo na stejné adrese jako stránka. Jména firem, měst a nákladů bere ze souborů `names/<hra>/`, název kamionu z jeho zakázek. Běží v Dockeru spolu s API:
 
-Mapa potřebuje submodul s naším patchem (`maplibre-gl` 6 nemá výchozí export, který kód mapy používá):
+Mapa potřebuje submodul s naším patchem (`maplibre-gl` 6 nemá výchozí export, který kód mapy používá, a knihovna má Jižní Dakotu za nevydané DLC a skrývá silnice na hranicích s ní):
 
 ```sh
 git submodule update --init                                        # jen poprvé
 git -C tools/trucksim-maps apply ../trucksim-maps.patch            # jen poprvé
+# po změně patche: git -C tools/trucksim-maps checkout -- packages && git -C tools/trucksim-maps apply ../trucksim-maps.patch
 docker compose run --rm web npm ci   # jen poprvé a po změně package-lock.json
 docker compose up -d                 # http://localhost:5180
 ```
