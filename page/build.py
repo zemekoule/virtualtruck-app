@@ -9,8 +9,7 @@ from pathlib import Path
 
 PROFILE = 'andros'
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-# The plugin repository writes next to this one.
-DATA_DIR = PROJECT_DIR.parent / 'data'
+DATA_DIR = Path.home() / 'Library/Application Support/virtualtruck/data'
 STEAM_GAMES_DIR = Path.home() / 'Library/Application Support/Steam/steamapps/common'
 # Keys are the game ids the virtualtruck plugin names its data directories after.
 GAMES = {
