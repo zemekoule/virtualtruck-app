@@ -1,66 +1,13 @@
-# ATS jízdy
+# virtualtruck – aplikace
 
-Záznam jízd z American Truck Simulator a Euro Truck Simulator 2 (plugin `drivelog`) a lokální stránka s přehledem zakázek ze savu profilu `andros`.
+Přehled jízd z American Truck Simulator a Euro Truck Simulator 2 zaznamenaných pluginem [virtualtruck-plugin](https://github.com/zemekoule/virtualtruck-plugin) a ze savu profilu `andros`.
 
 ## Předpoklady
 
+- Repo pluginu je ve vedlejší složce a plugin zapisuje do `../data/<hra>/` (`data/ats/`, `data/eut2/` vedle tohoto repa), odkud data čtou skripty v `page/`.
 - Hra ukládá save jako text: v `config.cfg` (`~/Library/Application Support/American Truck Simulator/`, resp. `Euro Truck Simulator 2/`) je `uset g_save_format "2"`.
-- Xcode Command Line Tools (`clang++`, `make`), Python 3.
-
-## Plugin
-
-Stejný plugin funguje v ATS i v ETS2. Zapisuje do `data/<hra>/` v tomto projektu (`data/ats/`, `data/eut2/`):
-
-- `events.jsonl` – převzetí zakázky, doručení / zrušení, pokuty, mýto, trajekty, vlaky,
-- `trace.jsonl` – každých 5 s jízdy (mimo pauzu) pozice, rychlost, palivo, tachometr.
-
-Cesta k `data/` se do pluginu vloží při překladu. Po přesunu projektu je potřeba plugin znovu přeložit a nainstalovat.
-
-### Build
-
-```sh
-cd plugin
-make
-```
-
-Výsledkem je `plugin/drivelog.so` (x86_64 – hra na Macu běží přes Rosettu).
-
-### Instalace
-
-1. Ukonči hru.
-2. ```sh
-   cd plugin
-   make install
-   ```
-   Zkopíruje `drivelog.so` do `American Truck Simulator.app/Contents/MacOS/plugins/` ve Steam instalaci.
-
-   Pokud skončí `Operation not permitted`: macOS (Správa aplikací) nedovolí terminálu zapisovat do balíku `.app`. Buď terminálu (Ghostty) povol *Nastavení systému → Soukromí a zabezpečení → Správa aplikací*, nebo `drivelog.so` přetáhni s ⌥ ve Finderu:
-   ```sh
-   open plugin ~/Library/Application\ Support/Steam/steamapps/common/American\ Truck\ Simulator/American\ Truck\ Simulator.app/Contents/MacOS/plugins
-   ```
-   Mazání z balíku (`make uninstall`) ochrana neblokuje – smazání jiného pluginu odtud prošlo.
-
-   ETS2: `make install` umí jen ATS, do ETS2 přetáhni `drivelog.so` s ⌥ ve Finderu:
-   ```sh
-   open plugin ~/Library/Application\ Support/Steam/steamapps/common/Euro\ Truck\ Simulator\ 2/Euro\ Truck\ Simulator\ 2.app/Contents/MacOS/plugins
-   ```
-3. Spusť hru. Pokud hra upozorní na SDK pluginy, potvrď.
-4. Kontrola: v projektu vznikne `data/<hra>/events.jsonl` a `data/<hra>/trace.jsonl`. V `game.log.txt` hry je řádek `drivelog <verze>: writing to …` – verze musí odpovídat poslední v `plugin/CHANGELOG.md`.
-
-### Odinstalace
-
-Ukonči hru a spusť:
-
-```sh
-cd plugin
-make uninstall
-```
-
-Data v `data/` zůstanou.
-
-### Aktualizace pluginu
-
-Ukonči hru, pak `make install` (přeloží a přepíše). Za běhu hry jde plugin vyměnit i příkazem `sdk reload` v herní konzoli.
+- Python 3, Node (`web/`).
+- Mapové nástroje jsou v submodulu: `git submodule update --init`, pak postup v sekci Mapa.
 
 ## Stránka
 
@@ -72,7 +19,7 @@ make import-save    # kdykoli: zakázky ze savu, které plugin nezaznamenal, a d
 open page/index.html
 ```
 
-`make sync` (`page/sync.py`) každých 5 s nahraje nové řádky z `data/<hra>/*.jsonl`, přepočítá zakázky z pluginu (logikou z `build.py`) a jména a při startu zapíše `page/config.js` (publishable key pro stránku). `make import-save` (`page/import_save.py`) vezme poslední save každé hry a přidá zakázky, které v databázi nejsou (ani z pluginu, ani z dřívějšího importu), a depa podle měst. Pouštěj ho až po nahrání zakázek z pluginu, jinak bude zakázka dvakrát.
+`make sync` (`page/sync.py`) každých 5 s nahraje nové řádky z `../data/<hra>/*.jsonl`, přepočítá zakázky z pluginu (logikou z `build.py`) a jména a při startu zapíše `page/config.js` (publishable key pro stránku). `make import-save` (`page/import_save.py`) vezme poslední save každé hry a přidá zakázky, které v databázi nejsou (ani z pluginu, ani z dřívějšího importu), a depa podle měst. Pouštěj ho až po nahrání zakázek z pluginu, jinak bude zakázka dvakrát.
 
 - `page/nakladni.html` – zakázky kamionem v ATS zaznamenané pluginem, s detailem (trasa, rychlost, spotřeba, pokuty…). Probíhající WoT zakázku jde v detailu zrušit ručně (SDK její zrušení nehlásí), zrušení se ukládá do tabulky `cancellations`.
 - `page/nakladni-ets2.html` – totéž pro ETS2 (km, km/h, l, €).
@@ -80,10 +27,6 @@ open page/index.html
 - `page/mesta.html`, `page/mesta-ets2.html` – vyhledání města: všechna depa (seznam ze savu), z/do kterých jsem vezl, a seznam zakázek (všechny ze savu i z pluginu), z přehledu jízd se na město jde kliknutím na jeho název.
 
 `make build` (`page/build.py`) zapíše stejná data lokálně do `page/data-<hra>.js` (se starým párováním plugin ↔ save). Stránky ho už nečtou, používají ho jen návrhy grafiky níže.
-
-### Návrhy grafiky
-
-`navrhy/` – odložené návrhy grafické časové osy zakázky (`radek.html` jeden řádek, `navrhy.html` kniha jízd, tachograf, profil cesty). Čtou `page/data-ats.js`; `navrhy/speed.js` je jednorázový výřez rychlosti ze stopy (2026-10-25). Na stránce jízd je použitá varianta „1 s hodinovou osou“ (`page/timeline-chart.js`).
 
 ### Mapa
 

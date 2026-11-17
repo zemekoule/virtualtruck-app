@@ -73,7 +73,7 @@ def main():
             roads, nodes, cities, pois = read_parser_output(Path(out), map_name)
     output = PROJECT_DIR / f'page/map-{game}.js'
 
-    # Parser x/y are the game x/z world coordinates, the same as in the drivelog trace.
+    # Parser x/y are the game x/z world coordinates, the same as in the virtualtruck trace.
     segments = [coord for r in roads for coord in (*nodes[r['startNodeUid']], *nodes[r['endNodeUid']])]
     shields = [[*s, round(p['x']), round(p['y'])] for p in pois if p['type'] == 'road' and (s := shield(p['icon']))]
     companies = [[p['label'], round(p['x']), round(p['y'])] for p in pois if p['type'] == 'company']
