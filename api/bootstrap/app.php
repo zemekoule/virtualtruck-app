@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
         $middleware->redirectGuestsTo(fn () => null);
+        // Plugin lines are stored as the game sent them (e.g. licence plates with leading spaces).
+        $isIngest = fn (Request $request) => $request->is('api/ingest/*');
+        $middleware->trimStrings(except: [$isIngest]);
+        $middleware->convertEmptyStringsToNull(except: [$isIngest]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

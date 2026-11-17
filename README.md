@@ -88,6 +88,19 @@ docker compose run --rm api vendor/bin/phpstan analyse   # Larastan, level max
 docker compose run --rm api composer audit               # známé zranitelnosti v balíčcích
 ```
 
+### Data z pluginu
+
+Plugin posílá řádky svých souborů `<hra>/events.jsonl` a `<hra>/trace.jsonl` s osobním tokenem (`Authorization: Bearer …`). Token vytvoří přihlášený uživatel přes `POST /api/tokens` (`{"name": "…"}`), tokenem samotným nový token získat nejde.
+
+- `GET /api/ingest/<hra>/<soubor>` vrátí `last_seq`, číslo posledního uloženého řádku (`seq` = číslo řádku v souboru, od 1).
+- `POST /api/ingest/<hra>/<soubor>` s `{"seq": <číslo prvního řádku>, "lines": [ … ]}`, nejvýš 1000 řádků. Už uložené řádky přeskočí (dávku jde poslat znovu), pokud se shodují s uloženými. Mezeru za uloženými řádky nebo jiný obsah pod stejným `seq` (plugin začal soubor znovu) odmítne s `409` a `last_seq`. Řádky se ukládají jako JSON se stejným obsahem, řetězce beze změny (bez ořezu mezer).
+
+Import už zapsaných souborů (např. historie z `../data`), uložené řádky přeskočí:
+
+```sh
+docker compose run --rm -v "$PWD/../data:/data:ro" api php artisan ingest:import <e-mail> /data
+```
+
 Všechny cesty API jsou pod `/api` (i `/api/login`, `/api/register`, `/api/logout` a `/api/sanctum/csrf-cookie`), aby šly na hostingu oddělit od statické stránky.
 
 ## Licence
