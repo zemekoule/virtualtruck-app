@@ -73,6 +73,21 @@ make tiles   # tools/make-tiles.sh, ~6 minut; po aktualizaci hry nebo novém DLC
 
 Potřebuje `tippecanoe` (`brew install tippecanoe`) a závislosti generátoru v klonu (`nvm exec 24 npm install -w packages/clis/generator --ignore-scripts`). Generátor nespouštěj přes `npx generator` – mimo workspace stáhne z npm cizí balík stejného jména.
 
+## API (`api/`)
+
+Laravel s MariaDB, běží v Dockeru (`compose.yaml`). Zatím jen registrace a přihlášení (Fortify, Sanctum SPA), stránky ho ještě nepoužívají.
+
+```sh
+cp api/.env.example api/.env                          # jen poprvé
+docker compose run --rm api composer install          # jen poprvé
+docker compose run --rm api php artisan key:generate  # jen poprvé
+docker compose up -d                                  # http://localhost:8100
+docker compose run --rm api php artisan migrate
+docker compose run --rm api php artisan test
+```
+
+Všechny cesty API jsou pod `/api` (i `/api/login`, `/api/register`, `/api/logout` a `/api/sanctum/csrf-cookie`), aby šly na hostingu oddělit od statické stránky.
+
 ## Licence
 
 GPL-3.0, viz `LICENSE`. Mapa ve `web/` používá kód z [TruckSim Maps](https://github.com/truckermudgeon/maps) (GPL-3.0).
