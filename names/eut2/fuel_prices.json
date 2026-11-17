@@ -1,0 +1,182 @@
+[
+ {
+  "id": "albania",
+  "name": "Albánie",
+  "price": 2.3011
+ },
+ {
+  "id": "belgium",
+  "name": "Belgie",
+  "price": 2.313
+ },
+ {
+  "id": "bosnia",
+  "name": "Bosna a Hercegovina",
+  "price": 1.924
+ },
+ {
+  "id": "bulgaria",
+  "name": "Bulharsko",
+  "price": 1.918
+ },
+ {
+  "id": "croatia",
+  "name": "Chorvatsko",
+  "price": 2.036
+ },
+ {
+  "id": "denmark",
+  "name": "Dánsko",
+  "price": 2.647
+ },
+ {
+  "id": "estonia",
+  "name": "Estonsko",
+  "price": 2.137
+ },
+ {
+  "id": "finland",
+  "name": "Finsko",
+  "price": 2.514
+ },
+ {
+  "id": "france",
+  "name": "Francie",
+  "price": 2.356
+ },
+ {
+  "id": "iceland",
+  "name": "Island",
+  "price": 2.307
+ },
+ {
+  "id": "italy",
+  "name": "Itálie",
+  "price": 2.228
+ },
+ {
+  "id": "kosovo",
+  "name": "Kosovo",
+  "price": 1.856
+ },
+ {
+  "id": "lithuania",
+  "name": "Litva",
+  "price": 2.139
+ },
+ {
+  "id": "latvia",
+  "name": "Lotyšsko",
+  "price": 2.09
+ },
+ {
+  "id": "luxembourg",
+  "name": "Lucembursko",
+  "price": 1.99
+ },
+ {
+  "id": "hungary",
+  "name": "Maďarsko",
+  "price": 1.94
+ },
+ {
+  "id": "netherlands",
+  "name": "Nizozemsko",
+  "price": 2.514
+ },
+ {
+  "id": "norway",
+  "name": "Norsko",
+  "price": 2.616
+ },
+ {
+  "id": "germany",
+  "name": "Německo",
+  "price": 2.244
+ },
+ {
+  "id": "poland",
+  "name": "Polsko",
+  "price": 2.061
+ },
+ {
+  "id": "portugal",
+  "name": "Portugalsko",
+  "price": 2.155
+ },
+ {
+  "id": "austria",
+  "name": "Rakousko",
+  "price": 2.138
+ },
+ {
+  "id": "romania",
+  "name": "Rumunsko",
+  "price": 2.046
+ },
+ {
+  "id": "russia",
+  "name": "Rusko",
+  "price": 0.851
+ },
+ {
+  "id": "macedonia",
+  "name": "Severní Makedonie",
+  "price": 1.576
+ },
+ {
+  "id": "slovakia",
+  "name": "Slovensko",
+  "price": 1.978
+ },
+ {
+  "id": "slovenia",
+  "name": "Slovinsko",
+  "price": 1.883
+ },
+ {
+  "id": "uk",
+  "name": "Spojené království",
+  "price": 2.352
+ },
+ {
+  "id": "serbia",
+  "name": "Srbsko",
+  "price": 2.00935
+ },
+ {
+  "id": "turkey",
+  "name": "Turecko",
+  "price": 1.628
+ },
+ {
+  "id": "montenegro",
+  "name": "Černá Hora",
+  "price": 1.96
+ },
+ {
+  "id": "czech",
+  "name": "Česká republika",
+  "price": 2.0738
+ },
+ {
+  "id": "greece",
+  "name": "Řecko",
+  "price": 2.166
+ },
+ {
+  "id": "spain",
+  "name": "Španělsko",
+  "price": 1.896
+ },
+ {
+  "id": "sweden",
+  "name": "Švédsko",
+  "price": 1.993
+ },
+ {
+  "id": "switzerland",
+  "name": "Švýcarsko",
+  "price": 2.629
+ }
+]

@@ -1,0 +1,107 @@
+[
+ {
+  "id": "arizona",
+  "name": "Arizona",
+  "price": 1.64685
+ },
+ {
+  "id": "arkansas",
+  "name": "Arkansas",
+  "price": 1.56945
+ },
+ {
+  "id": "colorado",
+  "name": "Colorado",
+  "price": 1.55043
+ },
+ {
+  "id": "idaho",
+  "name": "Idaho",
+  "price": 1.63126
+ },
+ {
+  "id": "illinois",
+  "name": "Illinois",
+  "price": 1.64183
+ },
+ {
+  "id": "iowa",
+  "name": "Iowa",
+  "price": 1.61277
+ },
+ {
+  "id": "south_dakota",
+  "name": "Jižní Dakota",
+  "price": 1.56575
+ },
+ {
+  "id": "california",
+  "name": "Kalifornie",
+  "price": 2.16938
+ },
+ {
+  "id": "kansas",
+  "name": "Kansas",
+  "price": 1.56813
+ },
+ {
+  "id": "louisiana",
+  "name": "Louisiana",
+  "price": 1.55307
+ },
+ {
+  "id": "missouri",
+  "name": "Missouri",
+  "price": 1.56971
+ },
+ {
+  "id": "montana",
+  "name": "Montana",
+  "price": 1.59851
+ },
+ {
+  "id": "nebraska",
+  "name": "Nebraska",
+  "price": 1.57552
+ },
+ {
+  "id": "nevada",
+  "name": "Nevada",
+  "price": 1.7372
+ },
+ {
+  "id": "new_mexico",
+  "name": "Nové Mexiko",
+  "price": 1.659
+ },
+ {
+  "id": "oklahoma",
+  "name": "Oklahoma",
+  "price": 1.54514
+ },
+ {
+  "id": "oregon",
+  "name": "Oregon",
+  "price": 1.76282
+ },
+ {
+  "id": "texas",
+  "name": "Texas",
+  "price": 1.5536
+ },
+ {
+  "id": "utah",
+  "name": "Utah",
+  "price": 1.61251
+ },
+ {
+  "id": "washington",
+  "name": "Washington",
+  "price": 1.92132
+ },
+ {
+  "id": "wyoming",
+  "name": "Wyoming",
+  "price": 1.55703
+ }
+]

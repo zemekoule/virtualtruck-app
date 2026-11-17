@@ -1,0 +1,66 @@
+diff --git a/packages/clis/parser/game-files/def-parser.ts b/packages/clis/parser/game-files/def-parser.ts
+index 4094551..bebc348 100644
+--- a/packages/clis/parser/game-files/def-parser.ts
++++ b/packages/clis/parser/game-files/def-parser.ts
+@@ -139,13 +139,18 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+           convertSiiToJson(path, entries, CountrySiiSchema),
+         );
+         if (partialCountry) {
+-          const truckSpeedLimits = processSpeedLimitJson(
+-            convertSiiToJson(
+-              path.replace('.sui', '/speed_limits.sii'),
+-              entries,
+-              SpeedLimitSiiSchema,
+-            ),
+-          );
++          let truckSpeedLimits = {} as SpeedLimits;
++          try {
++            truckSpeedLimits = processSpeedLimitJson(
++              convertSiiToJson(
++                path.replace('.sui', '/speed_limits.sii'),
++                entries,
++                SpeedLimitSiiSchema,
++              ),
++            );
++          } catch (e) {
++            logger.warn(`skipping speed limits for ${partialCountry.token}: ${e}`);
++          }
+           countries.set(partialCountry.token, {
+             ...partialCountry,
+             truckSpeedLimits,
+@@ -238,7 +243,13 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+       const json = convertSiiToJson(`def/world/${f}`, entries, PrefabSiiSchema);
+       processPrefabJson(json, entries).forEach((v, k) => prefabs.set(k, v));
+     } else if (f.startsWith('model')) {
+-      const json = convertSiiToJson(`def/world/${f}`, entries, ModelSiiSchema);
++      let json;
++      try {
++        json = convertSiiToJson(`def/world/${f}`, entries, ModelSiiSchema);
++      } catch (e) {
++        logger.warn(`skipping models in ${f}: ${e}`);
++        continue;
++      }
+       const { buildings, vegetation: _vegetation } = processModelJson(
+         json,
+         entries,
+diff --git a/packages/clis/parser/game-files/map-files-parser.ts b/packages/clis/parser/game-files/map-files-parser.ts
+index b65d4c8..ca90216 100644
+--- a/packages/clis/parser/game-files/map-files-parser.ts
++++ b/packages/clis/parser/game-files/map-files-parser.ts
+@@ -404,7 +404,15 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+     // .dds pixel data. Assume that the concrete instance of the FileEntry for
+     // the .tobj file is an ScsArchiveTobjFile, whose .read() returns a complete
+     // header-ful .dds file.
+-    pngs.set(key, parseDds(tobj.read(), sdfAuxData.get(key)));
++    try {
++      pngs.set(key, parseDds(tobj.read(), sdfAuxData.get(key)));
++    } catch (e) {
++      logger.warn(`skipping icon ${key}: ${e}`);
++    }
++  }
++  if (![0, 1, 2, 3].every(i => pngs.has(`${map}-map${i}`))) {
++    logger.warn(`skipping ${map}-map4k, some mapX icons are missing`);
++    return pngs;
+   }
+ 
+   const mapPngs = [0, 1, 2, 3].map(i =>

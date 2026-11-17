@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATS nákladní jízdy</title>
+<link rel="stylesheet" href="common.css">
+</head>
+<body data-kind="truck">
+<main>
+	<nav><a href="index.html">Přehled</a><a href="nakladni.html" class="active">Nákladní ATS</a><a href="nakladni-ets2.html">Nákladní ETS2</a><a href="osobni.html">Osobní</a><a href="mesta.html">Města ATS</a><a href="mesta-ets2.html">Města ETS2</a></nav>
+	<h1>Nákladní jízdy ATS</h1>
+	<div class="muted">Zakázky kamionem zaznamenané pluginem drivelog. Kliknutím na řádek se zobrazí detail.</div>
+	<div class="stats" id="stats"></div>
+
+	<div class="table-wrap">
+		<table>
+			<thead id="head"></thead>
+			<tbody id="jobs"></tbody>
+		</table>
+	</div>
+</main>
+<script src="config.js"></script>
+<script src="data.js" data-game="ats" data-scripts="common.js map-ats.js map-view.js timeline-chart.js jizdy.js"></script>
+</body>
+</html>

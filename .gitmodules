@@ -1,0 +1,3 @@
+[submodule "tools/trucksim-maps"]
+	path = tools/trucksim-maps
+	url = https://github.com/truckermudgeon/maps.git
