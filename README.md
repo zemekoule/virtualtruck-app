@@ -92,6 +92,8 @@ docker compose run --rm api vendor/bin/phpstan analyse --memory-limit=1G   # Lar
 docker compose run --rm api composer audit               # známé zranitelnosti v balíčcích
 ```
 
+Totéž (testy na MariaDB, a kontrolu typů `web/`) pouští GitHub Actions u každého PR, po merge do `main` a každé pondělí kvůli nově zveřejněným zranitelnostem v PHP balíčcích (`.github/workflows/ci.yml`). Pondělní běh GitHub vypne po 60 dnech bez commitu, pak ho znovu zapni v záložce Actions. Opuštěné balíčky `composer audit` jen hlásí, neselže na nich.
+
 ### Data z pluginu
 
 Plugin posílá řádky svých souborů `<hra>/events.jsonl` a `<hra>/trace.jsonl` s osobním tokenem (`Authorization: Bearer …`). Token vytvoří, vypíše a zruší přihlášený uživatel ve `web/` v Nastavení (`GET`/`POST /api/tokens`, `DELETE /api/tokens/<id>`). Token má jen ability `ingest` (smí jen odesílat data), čtení dat a správa tokenů jdou jen po přihlášení (session).
