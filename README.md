@@ -94,16 +94,12 @@ docker compose run --rm api composer audit               # známé zranitelnosti
 
 ### Data z pluginu
 
-Plugin posílá řádky svých souborů `<hra>/events.jsonl` a `<hra>/trace.jsonl` s osobním tokenem (`Authorization: Bearer …`). Token vytvoří přihlášený uživatel přes `POST /api/tokens` (`{"name": "…"}`), tokenem samotným nový token získat nejde.
+Plugin posílá řádky svých souborů `<hra>/events.jsonl` a `<hra>/trace.jsonl` s osobním tokenem (`Authorization: Bearer …`). Token vytvoří, vypíše a zruší přihlášený uživatel ve `web/` v Nastavení (`GET`/`POST /api/tokens`, `DELETE /api/tokens/<id>`). Token má jen ability `ingest` (smí jen odesílat data), čtení dat a správa tokenů jdou jen po přihlášení (session).
 
 - `GET /api/ingest/<hra>/<soubor>` vrátí `last_seq`, číslo posledního uloženého řádku (`seq` = číslo řádku v souboru, od 1).
 - `POST /api/ingest/<hra>/<soubor>` s `{"seq": <číslo prvního řádku>, "lines": [ … ]}`, nejvýš 1000 řádků. Už uložené řádky přeskočí (dávku jde poslat znovu), pokud se shodují s uloženými. Mezeru za uloženými řádky nebo jiný obsah pod stejným `seq` (plugin začal soubor znovu) odmítne s `409` a `last_seq`. Řádky se ukládají jako JSON se stejným obsahem, řetězce beze změny (bez ořezu mezer).
 
-Plugin od verze 3.0.0 posílá data sám (konfigurace viz README pluginu). Dokud aplikace nemá obrazovku pro tokeny, token pro plugin vytvoří:
-
-```sh
-docker compose run --rm api php artisan tinker --execute="echo App\\Models\\User::firstWhere('email', '<e-mail>')->createToken('plugin')->plainTextToken;"
-```
+Plugin od verze 3.0.0 posílá data sám (konfigurace viz README pluginu).
 
 Import už zapsaných souborů (např. historie, kterou plugin zapsal bez konfigurace), uložené řádky přeskočí:
 
@@ -123,7 +119,7 @@ docker compose run --rm api php artisan jobs:compute
 
 ### Čtení dat
 
-Přihlášený uživatel (session i token) čte jen svoje data:
+Přihlášený uživatel (jen session, ne token) čte jen svoje data:
 
 - `GET /api/games/<hra>` vrátí `jobs` (z pluginu i ze savu), `depots`, `cancellations` (id ručně zrušených zakázek) a `refuels`.
 - `GET /api/games/<hra>/position` vrátí `point`, poslední bod stopy (mapa „Živě“).
