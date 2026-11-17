@@ -1,0 +1,30 @@
+name: virtualtruck
+
+services:
+  api:
+    build: docker/php
+    command: php artisan serve --host 0.0.0.0 --port 8000
+    ports:
+      - "8100:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: virtualtruck
+      MARIADB_USER: virtualtruck
+      MARIADB_PASSWORD: virtualtruck
+      MARIADB_ROOT_PASSWORD: root
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      retries: 30
+    volumes:
+      - db:/var/lib/mysql
+
+volumes:
+  db:
