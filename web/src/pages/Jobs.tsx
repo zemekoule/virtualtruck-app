@@ -18,9 +18,9 @@ const STATUS: Record<string, [string, string]> = {
 };
 
 const TITLES: Record<JobKind, [string, string, string]> = {
-	truck: ['Nákladní zakázky', 'Zakázky kamionem zaznamenané pluginem drivelog.', 'Kamion'],
-	car: ['Osobní doprava', 'Zakázky osobní dopravy zaznamenané pluginem drivelog (od verze 1.3.0). Hodnocení a spokojenost zákazníka doplní save po uložení hry.', 'Auto'],
-	bus: ['Autobusy', 'Linky a zájezdy autobusem zaznamenané pluginem drivelog (od verze 1.7.0).', 'Autobus'],
+	truck: ['Nákladní zakázky', 'Zakázky kamionem zaznamenané pluginem virtualtruck.', 'Kamion'],
+	car: ['Osobní doprava', 'Zakázky osobní dopravy zaznamenané pluginem virtualtruck (od verze 1.3.0). Hodnocení a spokojenost zákazníka doplní save po uložení hry.', 'Auto'],
+	bus: ['Autobusy', 'Linky a zájezdy autobusem zaznamenané pluginem virtualtruck (od verze 1.7.0).', 'Autobus'],
 };
 
 export function Jobs({ kind }: { kind: JobKind }) {

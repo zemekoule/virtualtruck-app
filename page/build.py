@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds page/data-<game>.js (used by the pages in page/) from the latest save of the profile and the drivelog plugin output."""
+"""Builds page/data-<game>.js (used by the pages in page/) from the latest save of the profile and the virtualtruck plugin output."""
 
 import json
 import re
@@ -9,8 +9,10 @@ from pathlib import Path
 
 PROFILE = 'andros'
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+# The plugin repository writes next to this one.
+DATA_DIR = PROJECT_DIR.parent / 'data'
 STEAM_GAMES_DIR = Path.home() / 'Library/Application Support/Steam/steamapps/common'
-# Keys are the game ids the drivelog plugin names its data directories after.
+# Keys are the game ids the virtualtruck plugin names its data directories after.
 GAMES = {
     'ats': {'install_dir': STEAM_GAMES_DIR / 'American Truck Simulator', 'user_dir': Path.home() / 'Library/Application Support/American Truck Simulator'},
     'eut2': {'install_dir': STEAM_GAMES_DIR / 'Euro Truck Simulator 2', 'user_dir': Path.home() / 'Library/Application Support/Euro Truck Simulator 2'},
@@ -383,10 +385,10 @@ def telemetry_job(trace, tank_price, incidents, transports, names, config, job_i
     }
 
 
-def telemetry_jobs(drivelog_dir, names):
-    events = read_jsonl(drivelog_dir / 'events.jsonl')
-    trace = read_jsonl(drivelog_dir / 'trace.jsonl')
-    _, tank_price = tank_prices(drivelog_dir.name, trace, events)
+def telemetry_jobs(plugin_dir, names):
+    events = read_jsonl(plugin_dir / 'events.jsonl')
+    trace = read_jsonl(plugin_dir / 'trace.jsonl')
+    _, tank_price = tank_prices(plugin_dir.name, trace, events)
     incidents = [e for e in events if e['type'] == 'gameplay' and e['id'].startswith('player.')]
     transports = [e['wall'] for e in incidents if e['id'] in ('player.use.ferry', 'player.use.train')]
     started, jobs = {}, []
@@ -462,7 +464,7 @@ def build(game):
         save, sii = None, ''
     jobs = save_jobs(sii) + save_car_jobs(sii)
     by_key = {job_key(j): j for j in jobs}
-    for t in telemetry_jobs(PROJECT_DIR / 'data' / game, names):
+    for t in telemetry_jobs(DATA_DIR / game, names):
         match = by_key.get(job_key(t)) if t['status'] == 'delivered' else None
         if match:
             match['id'] = t['id']

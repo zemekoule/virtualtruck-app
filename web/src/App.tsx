@@ -34,7 +34,7 @@ function Header({ game }: { game: GameId }) {
 	};
 	return (
 		<header className="topbar">
-			<Link to={`/${game}`} className="brand"><Logo />Drivelog</Link>
+			<Link to={`/${game}`} className="brand"><Logo />VirtualTruck</Link>
 			<div className="segmented" role="group" aria-label="Hra">
 				{GAMES.map(g => <Link key={g} to={`/${g}/${section(g)}`} className={g === game ? 'active' : ''}>{GAME_SHORT[g]}</Link>)}
 			</div>

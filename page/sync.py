@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Uploads the drivelog plugin output to Supabase and keeps the jobs computed from it up to date, until Ctrl+C."""
+"""Uploads the virtualtruck plugin output to Supabase and keeps the jobs computed from it up to date, until Ctrl+C."""
 
 import json
 import time
@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from build import GAMES, PROJECT_DIR, names_path, read_jsonl, read_names, tank_prices, telemetry_jobs
+from build import DATA_DIR, GAMES, PROJECT_DIR, names_path, read_jsonl, read_names, tank_prices, telemetry_jobs
 
 # The plugin writes a trace point every 5 s.
 SYNC_INTERVAL_S = 5
@@ -63,7 +63,7 @@ class Supabase:
 class GameSync:
     def __init__(self, db, game):
         self.db, self.game = db, game
-        self.dir = PROJECT_DIR / 'data' / game
+        self.dir = DATA_DIR / game
         # Loaded from the database on the first sync, so the script can start offline.
         self.uploaded_lines = None
         self.jobs = None
