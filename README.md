@@ -4,7 +4,7 @@ Přehled jízd z American Truck Simulator a Euro Truck Simulator 2 zaznamenanýc
 
 ## Předpoklady
 
-- Repo pluginu je ve vedlejší složce a plugin zapisuje do `../data/<hra>/` (`data/ats/`, `data/eut2/` vedle tohoto repa), odkud data čtou skripty v `page/`.
+- Plugin (od verze 3.0.0) zapisuje do `~/Library/Application Support/virtualtruck/data/<hra>/`, odkud data čtou skripty v `page/`.
 - Hra ukládá save jako text: v `config.cfg` (`~/Library/Application Support/American Truck Simulator/`, resp. `Euro Truck Simulator 2/`) je `uset g_save_format "2"`.
 - Python 3, Node (`web/`).
 - Mapové nástroje jsou v submodulu: `git submodule update --init`, pak postup v sekci Mapa.
@@ -19,7 +19,7 @@ make import-save    # kdykoli: zakázky ze savu, které plugin nezaznamenal, a d
 open page/index.html
 ```
 
-`make sync` (`page/sync.py`) každých 5 s nahraje nové řádky z `../data/<hra>/*.jsonl`, přepočítá zakázky z pluginu (logikou z `build.py`) a jména a při startu zapíše `page/config.js` (publishable key pro stránku). `make import-save` (`page/import_save.py`) vezme poslední save každé hry a přidá zakázky, které v databázi nejsou (ani z pluginu, ani z dřívějšího importu), a depa podle měst. Pouštěj ho až po nahrání zakázek z pluginu, jinak bude zakázka dvakrát.
+`make sync` (`page/sync.py`) každých 5 s nahraje nové řádky z `<hra>/*.jsonl` (viz výše), přepočítá zakázky z pluginu (logikou z `build.py`) a jména a při startu zapíše `page/config.js` (publishable key pro stránku). `make import-save` (`page/import_save.py`) vezme poslední save každé hry a přidá zakázky, které v databázi nejsou (ani z pluginu, ani z dřívějšího importu), a depa podle měst. Pouštěj ho až po nahrání zakázek z pluginu, jinak bude zakázka dvakrát.
 
 - `page/nakladni.html` – zakázky kamionem v ATS zaznamenané pluginem, s detailem (trasa, rychlost, spotřeba, pokuty…). Probíhající WoT zakázku jde v detailu zrušit ručně (SDK její zrušení nehlásí), zrušení se ukládá do tabulky `cancellations`.
 - `page/nakladni-ets2.html` – totéž pro ETS2 (km, km/h, l, €).
@@ -95,10 +95,16 @@ Plugin posílá řádky svých souborů `<hra>/events.jsonl` a `<hra>/trace.json
 - `GET /api/ingest/<hra>/<soubor>` vrátí `last_seq`, číslo posledního uloženého řádku (`seq` = číslo řádku v souboru, od 1).
 - `POST /api/ingest/<hra>/<soubor>` s `{"seq": <číslo prvního řádku>, "lines": [ … ]}`, nejvýš 1000 řádků. Už uložené řádky přeskočí (dávku jde poslat znovu), pokud se shodují s uloženými. Mezeru za uloženými řádky nebo jiný obsah pod stejným `seq` (plugin začal soubor znovu) odmítne s `409` a `last_seq`. Řádky se ukládají jako JSON se stejným obsahem, řetězce beze změny (bez ořezu mezer).
 
-Import už zapsaných souborů (např. historie z `../data`), uložené řádky přeskočí:
+Plugin od verze 3.0.0 posílá data sám (konfigurace viz README pluginu). Dokud aplikace nemá obrazovku pro tokeny, token pro plugin vytvoří:
 
 ```sh
-docker compose run --rm -v "$PWD/../data:/data:ro" api php artisan ingest:import <e-mail> /data
+docker compose run --rm api php artisan tinker --execute="echo App\\Models\\User::firstWhere('email', '<e-mail>')->createToken('plugin')->plainTextToken;"
+```
+
+Import už zapsaných souborů (např. historie, kterou plugin zapsal bez konfigurace), uložené řádky přeskočí:
+
+```sh
+docker compose run --rm -v "$HOME/Library/Application Support/virtualtruck/data:/data:ro" api php artisan ingest:import <e-mail> /data
 ```
 
 ### Zakázky a tankování
