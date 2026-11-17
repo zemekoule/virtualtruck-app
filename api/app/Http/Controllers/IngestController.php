@@ -8,7 +8,6 @@ use App\Enums\DataFile;
 use App\Enums\Game;
 use App\Ingest\RawData;
 use App\Ingest\SeqConflictException;
-use App\Models\User;
 use App\Telemetry\JobComputation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,11 +34,5 @@ class IngestController extends Controller
         defer(fn () => $computation->run($user, $game));
 
         return response()->json(['last_seq' => $last]);
-    }
-
-    private function user(Request $request): User
-    {
-        /** @var User */
-        return $request->user();
     }
 }
