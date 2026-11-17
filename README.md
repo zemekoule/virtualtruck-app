@@ -58,7 +58,11 @@ Projde archivy hry (`def.scs`, `locale.scs`, `dlc_*.scs`) a přepíše tři JSON
 
 Přepis `page/` do Vite + React + TS. Data čte z API (`api/`) po přihlášení, Vite na API přeposílá `/api`, aby přihlášení (cookie) bylo na stejné adrese jako stránka. Jména firem, měst a nákladů bere ze souborů `names/<hra>/`, název kamionu z jeho zakázek. Běží v Dockeru spolu s API:
 
+Mapa potřebuje submodul s naším patchem (`maplibre-gl` 6 nemá výchozí export, který kód mapy používá):
+
 ```sh
+git submodule update --init                                        # jen poprvé
+git -C tools/trucksim-maps apply ../trucksim-maps.patch            # jen poprvé
 docker compose run --rm web npm ci   # jen poprvé a po změně package-lock.json
 docker compose up -d                 # http://localhost:5180
 ```
@@ -92,7 +96,7 @@ docker compose run --rm api vendor/bin/phpstan analyse --memory-limit=1G   # Lar
 docker compose run --rm api composer audit               # známé zranitelnosti v balíčcích
 ```
 
-Totéž (testy na MariaDB, a kontrolu typů `web/`) pouští GitHub Actions u každého PR, po merge do `main` a každé pondělí kvůli nově zveřejněným zranitelnostem v PHP balíčcích (`.github/workflows/ci.yml`). Pondělní běh GitHub vypne po 60 dnech bez commitu, pak ho znovu zapni v záložce Actions. Opuštěné balíčky `composer audit` jen hlásí, neselže na nich.
+Totéž (testy na MariaDB, a kontrolu typů a build `web/` se submodulem a patchem) pouští GitHub Actions u každého PR, po merge do `main` a každé pondělí kvůli nově zveřejněným zranitelnostem v PHP balíčcích a v balíčcích, které jdou do stránky (`npm audit --omit=dev`, selže od vysoké závažnosti) (`.github/workflows/ci.yml`). Pondělní běh GitHub vypne po 60 dnech bez commitu, pak ho znovu zapni v záložce Actions. Opuštěné balíčky `composer audit` jen hlásí, neselže na nich.
 
 ### Data z pluginu
 

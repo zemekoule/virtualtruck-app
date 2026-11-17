@@ -1,8 +1,9 @@
 import { fromAtsCoordsToWgs84, fromEts2CoordsToWgs84 } from '@truckermudgeon/map/projections';
 import { GameMapStyle } from '@truckermudgeon/ui/GameMapStyle';
 import type { FeatureCollection } from 'geojson';
-import type { StyleSpecification } from 'maplibre-gl';
+import { setWorkerUrl, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { type ReactNode, useMemo, useRef } from 'react';
 import MapGL, { Layer, type MapRef, NavigationControl, Source } from 'react-map-gl/maplibre';
 import type { GameId } from './types';
@@ -16,6 +17,9 @@ const MAP_STYLE: StyleSpecification = {
 	// Land colour of the dark mode in tools/trucksim-maps (BaseMapStyle), without its real-world base map.
 	layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#1a1a1a' } }],
 };
+
+// MapLibre looks for its worker next to its own file, which Vite moves when it bundles the library.
+setWorkerUrl(workerUrl);
 
 const TILE_GAME = { ats: 'ats', eut2: 'ets2' } as const;
 

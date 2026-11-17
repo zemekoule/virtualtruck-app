@@ -65,10 +65,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The map code of the page is in the submodule.
+          submodules: true
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+      # Only what goes to the page; the dev tools (vite and its picomatch) have an advisory without a fix.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npx tsc
+      - run: git -C ../tools/trucksim-maps apply ../trucksim-maps.patch
+      - run: npx vite build
