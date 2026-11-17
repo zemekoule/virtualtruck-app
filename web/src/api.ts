@@ -92,3 +92,9 @@ export const setCancelledByHand = (game: GameId, id: string, cancelled: boolean)
 	api(`games/${game}/cancellations/${encodeURIComponent(id)}`, { method: cancelled ? 'PUT' : 'DELETE' });
 
 export const latestTracePoint = async (game: GameId) => (await api<{ point: TracePoint | null }>(`games/${game}/position`)).point;
+
+export type Token = { id: number; name: string; last_used_at: string | null; created_at: string };
+
+export const tokens = () => api<Token[]>('tokens');
+export const createToken = (name: string) => api<{ id: number; token: string }>('tokens', { method: 'POST', body: JSON.stringify({ name }) });
+export const deleteToken = (id: number) => api(`tokens/${id}`, { method: 'DELETE' });

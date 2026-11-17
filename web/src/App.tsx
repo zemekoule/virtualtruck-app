@@ -10,6 +10,7 @@ import { Jobs } from './pages/Jobs';
 import { Live } from './pages/Live';
 import { Fuel } from './pages/Fuel';
 import { Refuels } from './pages/Refuels';
+import { Settings } from './pages/Settings';
 import { Overview } from './pages/Overview';
 import { Stats } from './pages/Stats';
 import type { GameData, GameId } from './types';
@@ -53,6 +54,7 @@ function Header({ game }: { game: GameId }) {
 				<NavLink to={`/${game}/statistiky`}>Statistiky</NavLink>
 				<NavLink to={`/${game}/zive`}>Živě</NavLink>
 			</nav>
+			<NavLink to={`/${game}/nastaveni`} className="text-button">Nastavení</NavLink>
 			<button type="button" className="text-button" title={auth.user.email} onClick={auth.logout}>Odhlásit</button>
 		</header>
 	);
@@ -118,6 +120,7 @@ export function App() {
 					<Route path="tankovani" element={<Refuels />} />
 					<Route path="statistiky" element={<Stats />} />
 					<Route path="zive" element={<Live />} />
+					<Route path="nastaveni" element={<Settings />} />
 				</Route>
 			</Routes>
 		</BrowserRouter>
