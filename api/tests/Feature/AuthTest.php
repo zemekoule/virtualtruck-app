@@ -37,7 +37,7 @@ class AuthTest extends TestCase
             'password_confirmation' => 'secret-password',
         ])->assertCreated();
 
-        $this->assertAuthenticatedAs(User::firstWhere('email', 'andros@example.com'));
+        $this->assertAuthenticatedAs(User::where('email', 'andros@example.com')->sole());
     }
 
     public function test_registration_rejects_taken_email(): void
