@@ -84,7 +84,7 @@ docker compose run --rm api php artisan key:generate  # jen poprvé
 docker compose up -d                                  # http://localhost:8100
 docker compose run --rm api php artisan migrate
 docker compose run --rm api php artisan test
-docker compose run --rm api vendor/bin/phpstan analyse   # Larastan, level max
+docker compose run --rm api vendor/bin/phpstan analyse --memory-limit=1G   # Larastan, level max
 docker compose run --rm api composer audit               # známé zranitelnosti v balíčcích
 ```
 
@@ -116,6 +116,24 @@ Ručně (např. po `ingest:import`):
 ```sh
 docker compose run --rm api php artisan jobs:compute
 ```
+
+### Čtení dat
+
+Přihlášený uživatel (session i token) čte jen svoje data:
+
+- `GET /api/games/<hra>` vrátí `jobs` (z pluginu i ze savu), `depots`, `cancellations` (id ručně zrušených zakázek) a `refuels`.
+- `GET /api/games/<hra>/position` vrátí `point`, poslední bod stopy (mapa „Živě“).
+- `PUT` / `DELETE /api/games/<hra>/cancellations/<id zakázky>` ručně zruší / obnoví vlastní nedokončenou WoT nebo autobusovou zakázku (jejich zrušení SDK nehlásí), jiné odmítne s `422`.
+
+### Převod ze Supabase
+
+Do přepnutí na tohle API (krok 7 plánu) zůstává hlavním zdrojem Supabase. Zakázky ze savu, depa a ručně zrušené zakázky z ní převede (veřejným klíčem `SUPABASE_PROJECT_ID` a `SUPABASE_PUBLISHABLE_KEY` v `api/.env`) příkaz, který jde pouštět opakovaně – co převedl minule, nahradí aktuálním stavem v Supabase:
+
+```sh
+docker compose run --rm api php artisan supabase:import <e-mail>
+```
+
+Data z pluginu nepřevádí, ta posílá plugin.
 
 Všechny cesty API jsou pod `/api` (i `/api/login`, `/api/register`, `/api/logout` a `/api/sanctum/csrf-cookie`), aby šly na hostingu oddělit od statické stránky.
 
