@@ -101,6 +101,16 @@ Import už zapsaných souborů (např. historie z `../data`), uložené řádky 
 docker compose run --rm -v "$PWD/../data:/data:ro" api php artisan ingest:import <e-mail> /data
 ```
 
+### Zakázky a tankování
+
+Po každé přijaté dávce se po odeslání odpovědi (`defer`) přepočítají zakázky (`game_jobs`) a tankování (`refuels`) uživatele a hry, jen z toho, co přibylo: doručené a zrušené zakázky, jejichž stopa už celá dorazila, se znovu nepočítají a cena paliva v nádrži se počítá jen pro nové body stopy. Výpočet je port `telemetry_jobs` a `tank_prices` z `page/build.py` a dává stejná čísla (zaokrouhlení a součty jako Python). Pumpy a ceny paliva bere z `names/<hra>/` (`VIRTUALTRUCK_NAMES_DIR`).
+
+Ručně (např. po `ingest:import`):
+
+```sh
+docker compose run --rm api php artisan jobs:compute
+```
+
 Všechny cesty API jsou pod `/api` (i `/api/login`, `/api/register`, `/api/logout` a `/api/sanctum/csrf-cookie`), aby šly na hostingu oddělit od statické stránky.
 
 ## Licence
