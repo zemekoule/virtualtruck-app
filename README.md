@@ -72,3 +72,7 @@ make tiles   # tools/make-tiles.sh, ~6 minut; po aktualizaci hry nebo novém DLC
 `make tiles` zapíše i `web/public/tiles/parking-<hra>.json` (parkoviště ze stejného výstupu parseru, body do 200 m sloučené do jednoho). Čte je stránka „Živě“: každých 5 s si z tabulky `trace` vezme poslední polohu a minuty do přestávky a zvýrazní parkoviště v dosahu.
 
 Potřebuje `tippecanoe` (`brew install tippecanoe`) a závislosti generátoru v klonu (`nvm exec 24 npm install -w packages/clis/generator --ignore-scripts`). Generátor nespouštěj přes `npx generator` – mimo workspace stáhne z npm cizí balík stejného jména.
+
+## Licence
+
+GPL-3.0, viz `LICENSE`. Mapa ve `web/` používá kód z [TruckSim Maps](https://github.com/truckermudgeon/maps) (GPL-3.0).
