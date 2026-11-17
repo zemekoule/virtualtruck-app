@@ -1,49 +1,86 @@
-import type { GameData, GameId, Job, Refuel, TracePoint } from './types';
+import type { GameData, GameId, Job, NameKind, Refuel, TracePoint } from './types';
 
-const SUPABASE_URL = `https://${SUPABASE.projectId}.supabase.co/rest/v1/`;
-const PAGE_ROWS = 1000;
+export class Unauthenticated extends Error {
+	constructor() {
+		super('Přihlášení vypršelo, načti stránku a přihlas se znovu.');
+	}
+}
 
-async function supabase<T>(path: string, options: RequestInit = {}): Promise<T> {
-	const response = await fetch(SUPABASE_URL + path, { ...options, headers: { apikey: SUPABASE.publishableKey, 'Content-Type': 'application/json', ...options.headers } });
+export type User = { name: string; email: string };
+
+function xsrfToken() {
+	const cookie = document.cookie.split('; ').find(c => c.startsWith('XSRF-TOKEN='));
+	return cookie ? decodeURIComponent(cookie.slice('XSRF-TOKEN='.length)) : undefined;
+}
+
+async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+	const xsrf = xsrfToken();
+	const response = await fetch(`/api/${path}`, {
+		...options,
+		headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}), ...options.headers },
+	});
+	if (response.status === 401) throw new Unauthenticated();
 	const text = await response.text();
-	if (!response.ok) throw new Error(`${response.status} ${text}`);
+	if (!response.ok) throw new Error(response.status === 422 ? validationMessage(text) : `${response.status} ${text}`);
 	return text ? JSON.parse(text) : (null as T);
 }
 
-async function selectAll<T>(path: string): Promise<T[]> {
-	// The Data API returns at most 1000 rows per request.
-	const rows: T[] = [];
-	for (;;) {
-		const page = await supabase<T[]>(`${path}&limit=${PAGE_ROWS}&offset=${rows.length}`);
-		rows.push(...page);
-		if (page.length < PAGE_ROWS) return rows;
+function validationMessage(text: string) {
+	const { message, errors } = JSON.parse(text) as { message: string; errors?: Record<string, string[]> };
+	return errors ? Object.values(errors).flat().join(' ') : message;
+}
+
+export async function currentUser(): Promise<User | null> {
+	try {
+		return await api<User>('user');
+	} catch (e) {
+		if (e instanceof Unauthenticated) return null;
+		throw e;
 	}
 }
+
+// Sanctum sets the XSRF-TOKEN cookie, which the session login and registration need.
+const csrfCookie = () => api('sanctum/csrf-cookie');
+
+export async function login(email: string, password: string) {
+	await csrfCookie();
+	await api('login', { method: 'POST', body: JSON.stringify({ email, password, remember: true }) });
+}
+
+export async function register(name: string, email: string, password: string, passwordConfirmation: string) {
+	await csrfCookie();
+	await api('register', { method: 'POST', body: JSON.stringify({ name, email, password, password_confirmation: passwordConfirmation }) });
+}
+
+export const logout = () => api('logout', { method: 'POST' });
+
+const NAME_FILES = import.meta.glob<Record<string, string>>('../../names/*/{companies,cities,cargo}.json', { import: 'default' });
+const names = (game: GameId, kind: Exclude<NameKind, 'trucks'>) => NAME_FILES[`../../names/${game}/${kind}.json`]();
 
 const UNFINISHED = ['running', 'suspended'];
 // Cancelling an external (WoT) job sends no SDK event and a bus job cancel event is not known, so both are marked by hand on the page.
 export const canCancelByHand = (j: Job) => (j.kind === 'bus' || !!j.telemetry?.market?.startsWith('external_')) && UNFINISHED.includes(j.status);
 
 export async function loadGame(game: GameId): Promise<GameData> {
-	const [jobs, depots, names, cancellations, refuels] = await Promise.all([
-		selectAll<Job & { game: string; source: string }>(`jobs?game=eq.${game}&select=*&order=game_time.desc,id`),
-		selectAll<{ city: string; company: string }>(`depots?game=eq.${game}&select=city,company&order=city,company`),
-		selectAll<{ kind: keyof GameData['names']; id: string; name: string }>(`names?game=eq.${game}&select=kind,id,name&order=kind,id`),
-		selectAll<{ job_id: string }>(`cancellations?game=eq.${game}&select=job_id&order=job_id`),
-		selectAll<Refuel>(`refuels?game=eq.${game}&select=wall,game_time,truck,litres,country,garage,price&order=wall.desc`),
+	const [{ jobs, depots, cancellations, refuels }, companies, cities, cargo] = await Promise.all([
+		api<{ jobs: (Job & { truck_name: string | null })[]; depots: { city: string; company: string }[]; cancellations: string[]; refuels: Refuel[] }>(`games/${game}`),
+		names(game, 'companies'),
+		names(game, 'cities'),
+		names(game, 'cargo'),
 	]);
 	const data: GameData = {
 		game,
-		jobs: jobs.map(({ game: _game, source: _source, ...job }) => job),
+		jobs: jobs.map(({ truck_name: _truckName, ...job }) => job),
 		depots: {},
-		names: { companies: {}, cities: {}, cargo: {}, trucks: {} },
+		names: { companies, cities, cargo, trucks: {} },
 		refuels,
 	};
+	// The game sends the truck name only with a job, so a truck is named after its latest job (jobs come newest first).
+	for (const j of jobs) if (j.truck && j.truck_name) data.names.trucks[j.truck] ??= j.truck_name;
 	for (const d of depots) (data.depots[d.city] ??= []).push(d.company);
-	for (const n of names) data.names[n.kind][n.id] = n.name;
-	for (const { job_id } of cancellations) {
-		const j = data.jobs.find(j => j.id === job_id);
-		if (j && canCancelByHand(j)) {
+	const cancelled = new Set(cancellations);
+	for (const j of data.jobs) {
+		if (cancelled.has(j.id) && canCancelByHand(j)) {
 			j.status = 'cancelled';
 			j.cancelledByHand = true;
 		}
@@ -51,11 +88,7 @@ export async function loadGame(game: GameId): Promise<GameData> {
 	return data;
 }
 
-export const setCancelledByHand = (game: GameId, id: string, cancelled: boolean) => cancelled
-	? supabase('cancellations', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ game, job_id: id }) })
-	: supabase(`cancellations?game=eq.${game}&job_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const setCancelledByHand = (game: GameId, id: string, cancelled: boolean) =>
+	api(`games/${game}/cancellations/${encodeURIComponent(id)}`, { method: cancelled ? 'PUT' : 'DELETE' });
 
-export async function latestTracePoint(game: GameId): Promise<TracePoint | null> {
-	const rows = await supabase<{ data: TracePoint }[]>(`trace?game=eq.${game}&select=data&order=seq.desc&limit=1`);
-	return rows[0]?.data ?? null;
-}
+export const latestTracePoint = async (game: GameId) => (await api<{ point: TracePoint | null }>(`games/${game}/position`)).point;

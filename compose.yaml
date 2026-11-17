@@ -12,6 +12,19 @@ services:
       db:
         condition: service_healthy
 
+  web:
+    image: node:24-alpine
+    working_dir: /app/web
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "5180:5173"
+    volumes:
+      - .:/app
+      # Linux builds of the native packages, the host node_modules are for macOS.
+      - web_node_modules:/app/web/node_modules
+    depends_on:
+      - api
+
   db:
     image: mariadb:11.4
     environment:
@@ -28,3 +41,4 @@ services:
 
 volumes:
   db:
+  web_node_modules:

@@ -6,7 +6,7 @@ Přehled jízd z American Truck Simulator a Euro Truck Simulator 2 zaznamenanýc
 
 - Plugin (od verze 3.0.0) zapisuje do `~/Library/Application Support/virtualtruck/data/<hra>/`, odkud data čtou skripty v `page/`.
 - Hra ukládá save jako text: v `config.cfg` (`~/Library/Application Support/American Truck Simulator/`, resp. `Euro Truck Simulator 2/`) je `uset g_save_format "2"`.
-- Python 3, Node (`web/`).
+- Python 3, Docker (API a `web/`).
 - Mapové nástroje jsou v submodulu: `git submodule update --init`, pak postup v sekci Mapa.
 
 ## Stránka
@@ -56,12 +56,16 @@ Projde archivy hry (`def.scs`, `locale.scs`, `dlc_*.scs`) a přepíše tři JSON
 
 ## Nová stránka (`web/`)
 
-Přepis `page/` do Vite + React + TS, data čte stejně ze Supabase (publishable key bere Vite z `.env` v kořeni, tajný klíč do stránky nejde).
+Přepis `page/` do Vite + React + TS. Data čte z API (`api/`) po přihlášení, Vite na API přeposílá `/api`, aby přihlášení (cookie) bylo na stejné adrese jako stránka. Jména firem, měst a nákladů bere ze souborů `names/<hra>/`, název kamionu z jeho zakázek. Běží v Dockeru spolu s API:
 
 ```sh
-cd web && npm install   # jen poprvé
-make web                # http://localhost:5173
+docker compose run --rm web npm ci   # jen poprvé a po změně package-lock.json
+docker compose up -d                 # http://localhost:5180
 ```
+
+Přihlášení funguje jen na adrese `localhost:5180`, ta je v `SANCTUM_STATEFUL_DOMAINS` v `api/.env` (u staršího `api/.env` ji doplň podle `.env.example`).
+
+Do přepnutí na API na hostingu (krok 7 plánu) zůstává hlavním zdrojem Supabase: data, která má jen ona, převede do lokálního API `supabase:import` (viz API) a zakázky ručně ruš ve staré `page/`, zrušení ve `web/` se do Supabase nepropíše.
 
 Mapa v detailu zakázky je MapLibre se stylem z demo aplikace [TruckSim Maps](https://github.com/truckermudgeon/maps) (`GameMapStyle` z `tools/trucksim-maps/packages/libs/ui`, Vite ho bere přes aliasy, licence GPL-3.0). Dlaždice a ikony jsou v `web/public/tiles` (~320 MB):
 
@@ -69,13 +73,13 @@ Mapa v detailu zakázky je MapLibre se stylem z demo aplikace [TruckSim Maps](ht
 make tiles   # tools/make-tiles.sh, ~6 minut; po aktualizaci hry nebo novém DLC
 ```
 
-`make tiles` zapíše i `web/public/tiles/parking-<hra>.json` (parkoviště ze stejného výstupu parseru, body do 200 m sloučené do jednoho). Čte je stránka „Živě“: každých 5 s si z tabulky `trace` vezme poslední polohu a minuty do přestávky a zvýrazní parkoviště v dosahu.
+`make tiles` zapíše i `web/public/tiles/parking-<hra>.json` (parkoviště ze stejného výstupu parseru, body do 200 m sloučené do jednoho). Čte je stránka „Živě“: každých 5 s si z API vezme poslední polohu a minuty do přestávky a zvýrazní parkoviště v dosahu.
 
 Potřebuje `tippecanoe` (`brew install tippecanoe`) a závislosti generátoru v klonu (`nvm exec 24 npm install -w packages/clis/generator --ignore-scripts`). Generátor nespouštěj přes `npx generator` – mimo workspace stáhne z npm cizí balík stejného jména.
 
 ## API (`api/`)
 
-Laravel s MariaDB, běží v Dockeru (`compose.yaml`). Zatím jen registrace a přihlášení (Fortify, Sanctum SPA), stránky ho ještě nepoužívají.
+Laravel s MariaDB, běží v Dockeru (`compose.yaml`). Registrace a přihlášení (Fortify, Sanctum SPA), čte z něj `web/`.
 
 ```sh
 cp api/.env.example api/.env                          # jen poprvé

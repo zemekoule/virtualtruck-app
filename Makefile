@@ -10,7 +10,7 @@ import-save:
 	python3 page/import_save.py
 
 web:
-	cd web && npm run dev
+	docker compose up -d web
 
 tiles:
 	tools/make-tiles.sh
