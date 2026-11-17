@@ -85,6 +85,7 @@ docker compose up -d                                  # http://localhost:8100
 docker compose run --rm api php artisan migrate
 docker compose run --rm api php artisan test
 docker compose run --rm api vendor/bin/phpstan analyse   # Larastan, level max
+docker compose run --rm api composer audit               # známé zranitelnosti v balíčcích
 ```
 
 Všechny cesty API jsou pod `/api` (i `/api/login`, `/api/register`, `/api/logout` a `/api/sanctum/csrf-cookie`), aby šly na hostingu oddělit od statické stránky.
