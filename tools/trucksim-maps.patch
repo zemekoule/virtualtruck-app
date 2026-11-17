@@ -64,3 +64,14 @@ index b65d4c8..ca90216 100644
    }
  
    const mapPngs = [0, 1, 2, 3].map(i =>
+diff --git a/packages/libs/ui/pmtiles.ts b/packages/libs/ui/pmtiles.ts
+index c7b2ce8..cee61a8 100644
+--- a/packages/libs/ui/pmtiles.ts
++++ b/packages/libs/ui/pmtiles.ts
+@@ -1,5 +1,5 @@
+ import type { Extent } from '@truckermudgeon/base/geom';
+-import maplibregl from 'maplibre-gl';
++import * as maplibregl from 'maplibre-gl';
+ import * as pmtiles from 'pmtiles';
+ 
+ let pmTilesProtocolAdded = false;
