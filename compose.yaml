@@ -9,7 +9,8 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: mariadb:11.4
@@ -18,6 +19,10 @@ services:
       MARIADB_USER: virtualtruck
       MARIADB_PASSWORD: virtualtruck
       MARIADB_ROOT_PASSWORD: root
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      retries: 30
     volumes:
       - db:/var/lib/mysql
 

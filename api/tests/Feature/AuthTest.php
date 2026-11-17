@@ -23,6 +23,11 @@ class AuthTest extends TestCase
         $this->getJson('/api/user')->assertUnauthorized();
     }
 
+    public function test_guest_without_json_accept_header_gets_unauthorized(): void
+    {
+        $this->get('/api/user')->assertUnauthorized();
+    }
+
     public function test_registered_user_is_logged_in(): void
     {
         $this->postJson('/api/register', [
