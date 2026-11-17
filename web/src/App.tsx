@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useParams } from 'react-router';
-import { loadGame } from './api';
+import { currentUser, loadGame, logout, Unauthenticated, type User } from './api';
 import { GAME_SHORT, GameContext, gameFormat } from './format';
+import { Login } from './Login';
 import { Cargo } from './pages/Cargo';
 import { Cities } from './pages/Cities';
 import { JobDetail } from './pages/JobDetail';
@@ -16,6 +17,7 @@ import type { GameData, GameId } from './types';
 const GAMES: GameId[] = ['ats', 'eut2'];
 // Loaded once per game; switching pages does not reload it.
 const cache = new Map<GameId, Promise<GameData>>();
+const AuthContext = createContext<{ user: User; logout: () => void } | null>(null);
 
 function Logo() {
 	return (
@@ -27,6 +29,7 @@ function Logo() {
 
 function Header({ game }: { game: GameId }) {
 	const { pathname } = useLocation();
+	const auth = useContext(AuthContext)!;
 	// The other game keeps the section, a job detail goes back to its list; car jobs are only in ATS, bus jobs only in ETS2.
 	const section = (other: GameId) => {
 		const s = pathname.split('/')[2] ?? '';
@@ -50,20 +53,23 @@ function Header({ game }: { game: GameId }) {
 				<NavLink to={`/${game}/statistiky`}>Statistiky</NavLink>
 				<NavLink to={`/${game}/zive`}>Živě</NavLink>
 			</nav>
+			<button type="button" className="text-button" title={auth.user.email} onClick={auth.logout}>Odhlásit</button>
 		</header>
 	);
 }
 
 function GameLayout() {
 	const game = useParams().game as GameId;
+	const auth = useContext(AuthContext)!;
 	const [state, setState] = useState<{ game: GameId; data?: GameData; error?: string }>({ game });
 	const load = useCallback((fresh: boolean) => {
 		if (fresh || !cache.has(game)) cache.set(game, loadGame(game));
 		cache.get(game)!.then(data => setState({ game, data }), (e: Error) => {
 			cache.delete(game);
+			if (e instanceof Unauthenticated) return auth.logout();
 			setState({ game, error: e.message });
 		});
-	}, [game]);
+	}, [game, auth]);
 	useEffect(() => load(false), [load]);
 	const data = state.game === game ? state.data : undefined;
 	const value = useMemo(() => data && { data, f: gameFormat(data), reload: () => load(true) }, [data, load]);
@@ -72,7 +78,7 @@ function GameLayout() {
 	return (
 		<div className="app">
 			<Header game={game} />
-			{state.error ? <p className="page bad">Data ze Supabase se nenačetla: {state.error}</p>
+			{state.error ? <p className="page bad">Data se nenačetla: {state.error}</p>
 				: value ? <GameContext.Provider value={value}><Outlet /></GameContext.Provider>
 				: <p className="page muted">Načítám data…</p>}
 		</div>
@@ -80,7 +86,21 @@ function GameLayout() {
 }
 
 export function App() {
+	const [user, setUser] = useState<User | null | undefined>(undefined);
+	const [error, setError] = useState('');
+	const check = useCallback(() => {
+		cache.clear();
+		currentUser().then(setUser, (e: Error) => setError(e.message));
+	}, []);
+	useEffect(check, [check]);
+	// Logs out also when the session expired, then only the page state is cleared.
+	const auth = useMemo(() => user && { user, logout: () => logout().catch(() => {}).finally(() => setUser(null)) }, [user]);
+
+	if (error) return <p className="page bad">API neodpovídá: {error}</p>;
+	if (user === undefined) return <p className="page muted">Načítám…</p>;
+	if (!auth) return <Login onLogin={check} />;
 	return (
+		<AuthContext.Provider value={auth}>
 		<BrowserRouter>
 			<Routes>
 				<Route path="/" element={<Navigate to="/ats" replace />} />
@@ -101,5 +121,6 @@ export function App() {
 				</Route>
 			</Routes>
 		</BrowserRouter>
+		</AuthContext.Provider>
 	);
 }

@@ -189,3 +189,12 @@ table.wear { margin-top: 12px; }
 table.wear td { vertical-align: top; min-width: 110px; }
 .wear-value { display: block; font-weight: 600; }
 .wear-track { display: block; height: 6px; margin-top: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+
+.login { max-width: 360px; margin: 64px auto; }
+.login h1 { margin: 0; font-size: 20px; }
+.login label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; }
+.login input { padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px; color: var(--fg); font: inherit; }
+.login input:focus { outline: 0; border-color: var(--accent); }
+.login p { margin: 0; }
+.text-button { padding: 0; border: 0; background: none; color: var(--muted); font-size: 13px; }
+.text-button:hover { color: var(--accent); }
