@@ -47,7 +47,8 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          # Its banner (SSH and system version) would end up in the public log.
+          ssh-keyscan -H "$DEPLOY_HOST" 2>/dev/null >> ~/.ssh/known_hosts
           printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy "$DEPLOY_USER@$DEPLOY_HOST" "$TAG"
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
