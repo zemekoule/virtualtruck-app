@@ -1,0 +1,38 @@
+FROM node:24-alpine AS web
+RUN apk add --no-cache git
+WORKDIR /src
+COPY web/package.json web/package-lock.json web/
+RUN cd web && npm ci
+COPY tools tools
+COPY names names
+COPY web web
+# A local checkout may have the patch applied already.
+RUN cd tools/trucksim-maps && (git apply ../trucksim-maps.patch || git apply --reverse --check ../trucksim-maps.patch) \
+    && cd ../../web && npx vite build
+
+FROM dunglas/frankenphp:1.13.5-php8.5-alpine AS base
+RUN install-php-extensions pdo_mysql
+
+FROM base AS api
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+WORKDIR /app
+COPY api/composer.json api/composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --no-interaction --no-progress
+COPY api .
+RUN composer dump-autoload --optimize --no-dev && php artisan package:discover
+
+FROM base
+LABEL org.opencontainers.image.source=https://github.com/zemekoule/virtualtruck-app
+ENV APP_ENV=production XDG_CONFIG_HOME=/tmp/caddy XDG_DATA_HOME=/tmp/caddy
+WORKDIR /app
+COPY --from=api /app /app
+COPY --from=web /src/web/dist /app/public
+COPY names /app/names
+COPY docker/prod/Caddyfile /etc/frankenphp/Caddyfile
+COPY docker/prod/entrypoint.sh /usr/local/bin/entrypoint
+# The server copies the files of /app/deploy next to each other and runs compose from there.
+COPY deploy /app/deploy
+RUN chown -R www-data:www-data storage bootstrap/cache
+USER www-data
+EXPOSE 8080
+CMD ["entrypoint"]

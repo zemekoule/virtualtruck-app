@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        // The only proxy of the server, the app port is not published.
+        $middleware->trustProxies(at: '*');
         $middleware->alias(['abilities' => CheckAbilities::class]);
         $middleware->redirectGuestsTo(fn () => null);
         // Plugin lines are stored as the game sent them (e.g. licence plates with leading spaces).

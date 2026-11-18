@@ -1,0 +1,57 @@
+name: Deploy
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: true
+          fetch-depth: 0
+      # Only what went through a PR into the protected main is deployed.
+      - run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - run: printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker build -f Dockerfile.prod -t "$IMAGE" .
+      - run: docker push "$IMAGE"
+
+  deploy:
+    needs: image
+    runs-on: ubuntu-latest
+    concurrency: deploy
+    # The server gets this job's token to pull the image, so it can only read.
+    permissions:
+      packages: read
+    steps:
+      # The server pulls the image, swaps the container and rolls back when it does not become healthy.
+      - run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy "$DEPLOY_USER@$DEPLOY_HOST" "$TAG"
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}

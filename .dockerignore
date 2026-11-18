@@ -1,0 +1,17 @@
+**/node_modules
+**/.DS_Store
+.git
+.github
+api/.env*
+!api/.env.example
+api/auth.json
+api/storage/*.key
+api/vendor
+api/storage/logs/*
+api/storage/framework/*/*
+api/tests
+page
+supabase
+web/dist
+web/public/tiles
+tools/trucksim-maps/.git

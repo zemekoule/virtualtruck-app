@@ -1,0 +1,30 @@
+{
+	frankenphp
+	auto_https off
+	admin off
+}
+
+:8080 {
+	root * /app/public
+	# Only text types by default, the map reads .pmtiles by ranges.
+	encode zstd gzip
+
+	@app path /api/* /up
+	handle @app {
+		rewrite * /index.php
+		php
+	}
+
+	# A missing chunk or tile is a 404, not the page.
+	@files path /assets/* /tiles/*
+	handle @files {
+		file_server
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server {
+			hide .* *.php
+		}
+	}
+}
