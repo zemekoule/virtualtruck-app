@@ -56,3 +56,14 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
+
+  release:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}

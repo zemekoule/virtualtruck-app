@@ -96,7 +96,7 @@ Přihlášený uživatel čte jen svoje data:
 
 ## Vydání
 
-Vydává se značkou `v*` na commitu z `main` (`.github/workflows/deploy.yml`): kontroly z CI, produkční obraz (`Dockerfile.prod`, jeden kontejner obsluhuje API, stránku i dlaždice) do `ghcr.io/zemekoule/virtualtruck-app` a nasazení. Při nepovedeném nasazení se vrací předchozí verze, ale ne databáze – migrace proto musí jít tak, aby nad novým schématem běžela i předchozí verze (odebrání nebo přejmenování sloupce rozdělit do dvou vydání).
+Vydává se značkou `v*` na commitu z `main` (`.github/workflows/deploy.yml`): kontroly z CI, produkční obraz (`Dockerfile.prod`, jeden kontejner obsluhuje API, stránku i dlaždice) do `ghcr.io/zemekoule/virtualtruck-app`, nasazení a nakonec GitHub release se seznamem sloučených PR (vygeneruje ho GitHub). Při nepovedeném nasazení se vrací předchozí verze, ale ne databáze – migrace proto musí jít tak, aby nad novým schématem běžela i předchozí verze (odebrání nebo přejmenování sloupce rozdělit do dvou vydání).
 
 ## Licence
 
