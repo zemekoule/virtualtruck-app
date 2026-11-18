@@ -30,7 +30,8 @@ done
 
 # The spritesheet takes the icons of both maps from one directory.
 mkdir -p "$WORK/all/icons"
-cp "$WORK"/ats/usa-pois.json "$WORK"/eut2/europe-pois.json "$WORK/all/"
+# The map data reader needs more than the POIs (cities, companies).
+ln -s "$WORK"/ats/usa-*.json "$WORK"/eut2/europe-*.json "$WORK/all/"
 # ATS last, so its icon wins where both games have one.
 cp "$WORK"/eut2/icons/*.png "$WORK/all/icons/"
 cp "$WORK"/ats/icons/*.png "$WORK/all/icons/"
