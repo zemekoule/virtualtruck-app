@@ -144,6 +144,22 @@ Data z pluginu nepřevádí, ta posílá plugin.
 
 Všechny cesty API jsou pod `/api` (i `/api/login`, `/api/register`, `/api/logout` a `/api/sanctum/csrf-cookie`), aby šly na hostingu oddělit od statické stránky.
 
+## Nasazení
+
+Aplikace běží na https://virtualtruck.online na serveru, který spravuje jiný projekt. Nasazuje se značkou, ne mergem:
+
+```sh
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+Workflow `.github/workflows/deploy.yml` spustí kontroly z CI, postaví produkční obraz (`Dockerfile.prod`), pošle ho do `ghcr.io/zemekoule/virtualtruck-app` a po SSH ohlásí serveru značku. Server si obraz stáhne, vymění kontejner a když do 90 s nebude zdravý, vrátí předchozí značku. Databázi ale nevrátí, takže migrace musí jít tak, aby nad novým schématem běžela i předchozí verze (odebrání nebo přejmenování sloupce rozdělit do dvou vydání). Tajemství repozitáře: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`.
+
+Jeden kontejner (FrankenPHP) obsluhuje API pod `/api`, sestavenou stránku `web/` a dlaždice. Konfiguraci serveru si server bere z obrazu, ze složky `deploy/` (`compose.yaml`). Na serveru jsou v `/var/lib/virtualtruck/` tajemství (`app.env`: `APP_KEY`, `DB_PASSWORD`; `db.env`: `MARIADB_PASSWORD`, `MARIADB_ROOT_PASSWORD`), data MariaDB a dlaždice (`tiles/`, nahrávají se zvlášť, v obrazu nejsou). Kontejner při startu spustí migrace a zdravý (`/up`, sahá do databáze) je až potom. Nasadí se jen značka na commitu z `main`.
+
+Registrace je na serveru zavřená (`VIRTUALTRUCK_REGISTRATION=false`), účet založí `php artisan user:create <e-mail> <jméno>` (heslo se zeptá).
+
+Produkční obraz lokálně: `docker build -f Dockerfile.prod -t virtualtruck-prod .`
+
 ## Licence
 
 GPL-3.0, viz `LICENSE`. Mapa ve `web/` používá kód z [TruckSim Maps](https://github.com/truckermudgeon/maps) (GPL-3.0).

@@ -163,8 +163,9 @@ return [
     |
     */
 
-    'features' => [
-        Features::registration(),
-    ],
+    'features' => array_values(array_filter([
+        // Closed on the server until the VTC opens, accounts are created by user:create there.
+        env('VIRTUALTRUCK_REGISTRATION', true) ? Features::registration() : null,
+    ])),
 
 ];

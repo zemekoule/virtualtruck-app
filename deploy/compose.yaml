@@ -1,0 +1,52 @@
+name: virtualtruck
+
+services:
+  app:
+    image: ghcr.io/zemekoule/virtualtruck-app:${IMAGE_TAG:?}
+    restart: unless-stopped
+    env_file: /var/lib/virtualtruck/app.env
+    environment:
+      APP_URL: https://virtualtruck.online
+      APP_DEBUG: "false"
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: mariadb
+      DB_HOST: db
+      DB_DATABASE: virtualtruck
+      DB_USERNAME: virtualtruck
+      SANCTUM_STATEFUL_DOMAINS: virtualtruck.online
+      SESSION_SECURE_COOKIE: "true"
+      VIRTUALTRUCK_NAMES_DIR: /app/names
+      VIRTUALTRUCK_REGISTRATION: "false"
+    volumes:
+      - /var/lib/virtualtruck/tiles:/app/public/tiles:ro
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/up') === false ? 1 : 0);"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      default:
+      web:
+        aliases: [virtualtruck]
+
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    env_file: /var/lib/virtualtruck/db.env
+    environment:
+      MARIADB_DATABASE: virtualtruck
+      MARIADB_USER: virtualtruck
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      retries: 30
+    volumes:
+      - /var/lib/virtualtruck/mysql:/var/lib/mysql
+
+networks:
+  web:
+    external: true

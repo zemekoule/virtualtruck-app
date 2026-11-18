@@ -49,7 +49,9 @@ export async function login(email: string, password: string) {
 
 export async function register(name: string, email: string, password: string, passwordConfirmation: string) {
 	await csrfCookie();
-	await api('register', { method: 'POST', body: JSON.stringify({ name, email, password, password_confirmation: passwordConfirmation }) });
+	await api('register', { method: 'POST', body: JSON.stringify({ name, email, password, password_confirmation: passwordConfirmation }) }).catch((e: unknown) => {
+		throw e instanceof Error && e.message.startsWith('404 ') ? new Error('Registrace je zatím uzavřená.') : e;
+	});
 }
 
 export const logout = () => api('logout', { method: 'POST' });
