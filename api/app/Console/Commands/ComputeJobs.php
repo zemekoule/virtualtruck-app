@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 
 class ComputeJobs extends Command
 {
-    protected $signature = 'jobs:compute';
+    protected $signature = 'jobs:compute {--fresh : Compute the jobs from all events again, e.g. after fixing events by hand}';
 
     protected $description = 'Compute jobs and refuels from the plugin data that arrived since the last computation';
 
@@ -19,7 +19,10 @@ class ComputeJobs extends Command
     {
         foreach (User::all() as $user) {
             foreach (Game::cases() as $game) {
-                $computation->run($user, $game);
+                if ($this->option('fresh')) {
+                    $computation->forgetJobs($user, $game);
+                }
+                $computation->run($user, $game, wait: true);
             }
         }
 
