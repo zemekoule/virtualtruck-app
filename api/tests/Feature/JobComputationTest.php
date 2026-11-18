@@ -9,7 +9,10 @@ use App\Enums\Game;
 use App\Ingest\RawData;
 use App\Models\User;
 use App\Telemetry\JobComputation;
+use App\Telemetry\Trace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -154,7 +157,7 @@ class JobComputationTest extends TestCase
         $this->compute();
 
         $job = $this->job();
-        $this->assertSame(['delivered', 5000, 300, 202, 'man.tgx', 'praha', 'brno', 1], [$job['status'], $job['revenue'], $job['xp'], $job['km'], $job['truck'], $job['src_city'], $job['dst_city'], $job['complete']]);
+        $this->assertSame(['delivered', 5000, 300, 202, 'man.tgx', 'praha', 'brno'], [$job['status'], $job['revenue'], $job['xp'], $job['km'], $job['truck'], $job['src_city'], $job['dst_city']]);
         $telemetry = $this->telemetry();
         // The fuel in the tank before the first refuel gets its price: 30 l × 2.0.
         $this->assertSame(['driven_km' => 4.8, 'fuel_used' => 30, 'fuel_cost' => 60], array_intersect_key($telemetry['trace'], array_flip(['driven_km', 'fuel_used', 'fuel_cost'])));
@@ -171,12 +174,12 @@ class JobComputationTest extends TestCase
         $this->send(DataFile::Events, [...$this->takeJob(), $this->delivered(20)]);
         $this->send(DataFile::Trace, array_slice($this->trace(), 0, 3));
         $this->compute();
-        $this->assertSame([0, 0], [$this->job()['complete'], $this->telemetry()['trace']['driven_km']]);
+        $this->assertSame(0, $this->telemetry()['trace']['driven_km']);
 
         $this->send(DataFile::Trace, array_slice($this->trace(), 3));
         $this->compute();
 
-        $this->assertSame([1, 4.8], [$this->job()['complete'], $this->telemetry()['trace']['driven_km']]);
+        $this->assertSame(4.8, $this->telemetry()['trace']['driven_km']);
     }
 
     public function test_complete_job_is_not_computed_again(): void
@@ -203,6 +206,66 @@ class JobComputationTest extends TestCase
         $this->compute();
 
         $this->assertSame(self::T + 20, $this->telemetry()['end']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function otherJob(int $second): array
+    {
+        return ['wall' => self::T + $second, 'game_time' => 1003, 'type' => 'job', 'job_id' => '200', 'attrs' => [...$this->jobAttrs(), 'destination.city.id' => 'ostrava']];
+    }
+
+    public function test_events_ahead_of_their_trace_give_the_same_jobs(): void
+    {
+        $events = [...$this->takeJob(), $this->otherJob(17)];
+        $this->send(DataFile::Events, $events);
+        $this->send(DataFile::Trace, array_slice($this->trace(), 0, 2));
+        $this->compute();
+        $this->send(DataFile::Trace, array_slice($this->trace(), 2));
+        $this->compute();
+        $inBatches = DB::table('game_jobs')->orderBy('id')->get(['id', 'status', 'telemetry'])->all();
+
+        DB::table('game_jobs')->delete();
+        $this->user = User::factory()->create();
+        $this->send(DataFile::Events, $events);
+        $this->send(DataFile::Trace, $this->trace());
+        $this->compute();
+
+        $this->assertEquals(DB::table('game_jobs')->orderBy('id')->get(['id', 'status', 'telemetry'])->all(), $inBatches);
+        $this->assertSame('suspended', $this->job()['status']);
+    }
+
+    public function test_suspended_job_is_computed_again_only_when_resumed(): void
+    {
+        $this->send(DataFile::Events, [...$this->takeJob(), $this->otherJob(17)]);
+        $this->send(DataFile::Trace, $this->trace());
+        $this->compute();
+        DB::table('game_jobs')->where('id', '100')->update(['revenue' => 1]);
+
+        $this->send(DataFile::Trace, [$this->point(25, 7000, 255, 7, 1005)]);
+        $this->compute();
+        $this->assertSame(['suspended', 1], [$this->job()['status'], $this->job()['revenue']]);
+
+        $this->send(DataFile::Events, [['wall' => self::T + 30, 'game_time' => 1006, 'type' => 'job', 'job_id' => '100', 'attrs' => $this->jobAttrs()]]);
+        $this->send(DataFile::Trace, [$this->point(30, 7500, 250, 7.5, 1006)]);
+        $this->compute();
+
+        $this->assertSame(['running', null], [$this->job()['status'], $this->job()['revenue']]);
+    }
+
+    public function test_computation_running_elsewhere_is_not_waited_for(): void
+    {
+        $this->send(DataFile::Events, $this->takeJob());
+        $lock = Cache::lock("job-computation:{$this->user->id}:eut2", 600);
+        $this->assertTrue($lock->get());
+
+        $this->compute();
+        $this->assertSame(0, DB::table('game_jobs')->count());
+
+        $lock->release();
+        $this->compute();
+        $this->assertSame(1, DB::table('game_jobs')->count());
     }
 
     public function test_refuel_split_over_two_batches_is_one_refuel(): void
@@ -256,6 +319,28 @@ class JobComputationTest extends TestCase
         $this->postJson('/api/ingest/eut2/events', ['seq' => 1, 'lines' => [...$this->takeJob(), $this->delivered(20)]])->assertOk();
         $this->postJson('/api/ingest/eut2/trace', ['seq' => 1, 'lines' => $this->trace()])->assertOk();
 
-        $this->assertSame(1, $this->job()['complete']);
+        $this->assertSame([5000, 4.8], [$this->job()['revenue'], $this->telemetry()['trace']['driven_km']]);
+    }
+
+    public function test_fresh_computation_forgets_the_jobs_computed_before(): void
+    {
+        $this->send(DataFile::Events, [...$this->takeJob(), $this->delivered(20)]);
+        $this->send(DataFile::Trace, $this->trace());
+        $this->compute();
+        DB::table('game_jobs')->update(['revenue' => 1]);
+        DB::table('game_jobs')->insert(['user_id' => $this->user->id, 'game' => 'eut2', 'id' => 'gone', 'source' => 'plugin', 'kind' => 'truck', 'status' => 'running', 'game_time' => 0]);
+
+        $this->assertSame(0, Artisan::call('jobs:compute', ['--fresh' => true]));
+
+        $this->assertSame(['100'], DB::table('game_jobs')->pluck('id')->all());
+        $this->assertSame(5000, $this->job()['revenue']);
+    }
+
+    public function test_trace_ends_at_the_priced_points(): void
+    {
+        $this->send(DataFile::Trace, $this->trace());
+
+        $this->assertSame(self::T + 10, (new Trace($this->user->id, Game::Eut2, 3))->last()['wall'] ?? null);
+        $this->assertSame([self::T, self::T + 5, self::T + 10], array_column((new Trace($this->user->id, Game::Eut2, 3))->between(self::T, self::T + 20), 'wall'));
     }
 }

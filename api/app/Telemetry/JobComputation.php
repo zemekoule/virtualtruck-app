@@ -14,74 +14,114 @@ use Illuminate\Support\Facades\DB;
 /**
  * Computes jobs and refuels from the plugin data of a user and game, only from what has changed since the last run.
  *
- * @phpstan-import-type State from TankPrices
+ * @phpstan-import-type State from TankPrices as TankState
+ * @phpstan-import-type State from JobBuilder as JobState
  */
 class JobComputation
 {
     public function __construct(private readonly RawData $data) {}
 
-    public function run(User $user, Game $game): void
+    /**
+     * @param  bool  $wait  wait for a computation running elsewhere instead of leaving the new data to it
+     */
+    public function run(User $user, Game $game, bool $wait = false): void
     {
-        // Events and trace come in separate requests, each starts a computation; the second one waits and computes what the first one missed.
-        Cache::lock("job-computation:{$user->id}:{$game->value}", 600)->block(120, function () use ($user, $game) {
-            while ($this->computeNewData($user, $game)) {
-                // Lines may have arrived during the computation.
+        do {
+            // Events and trace come in separate requests; a request that finds the computation running leaves the new lines to it.
+            $lock = Cache::lock("job-computation:{$user->id}:{$game->value}", 600);
+            if ($wait) {
+                $lock->block(120);
+            } elseif (! $lock->get()) {
+                return;
             }
+            try {
+                while ($this->computeNewData($user, $game)) {
+                    // Lines may have arrived during the computation.
+                }
+            } finally {
+                $lock->release();
+            }
+            // Lines stored after the last check above whose request did not get the lock.
+        } while ($this->newData($user, $game) !== null);
+    }
+
+    /**
+     * Forget the jobs computed from the plugin data, the next run computes them from all events again (e.g. after fixing events by hand).
+     */
+    public function forgetJobs(User $user, Game $game): void
+    {
+        DB::transaction(function () use ($user, $game) {
+            DB::table('game_jobs')->where('user_id', $user->id)->where('game', $game->value)->where('source', 'plugin')->delete();
+            DB::table('job_computations')->where('user_id', $user->id)->where('game', $game->value)->update(['job_events_seq' => 0, 'job_state' => null, 'events_seq' => 0]);
         });
+    }
+
+    /**
+     * @return array{events: int, trace: int, done: \stdClass|null}|null the last seqs and the last computation when there is something new
+     */
+    private function newData(User $user, Game $game): ?array
+    {
+        $events = $this->data->lastSeq($user, $game, DataFile::Events);
+        $trace = $this->data->lastSeq($user, $game, DataFile::Trace);
+        $done = DB::table('job_computations')->where('user_id', $user->id)->where('game', $game->value)->first();
+        if ($done === null ? $events === 0 && $trace === 0 : self::int($done->events_seq) === $events && self::int($done->trace_seq) === $trace) {
+            return null;
+        }
+
+        return ['events' => $events, 'trace' => $trace, 'done' => $done];
     }
 
     private function computeNewData(User $user, Game $game): bool
     {
-        $eventsSeq = $this->data->lastSeq($user, $game, DataFile::Events);
-        $traceSeq = $this->data->lastSeq($user, $game, DataFile::Trace);
-        $done = DB::table('job_computations')->where('user_id', $user->id)->where('game', $game->value)->first();
-        if ($done !== null && self::int($done->events_seq) === $eventsSeq && self::int($done->trace_seq) === $traceSeq) {
+        $new = $this->newData($user, $game);
+        if ($new === null) {
             return false;
         }
-        /** @var State $tankState */
+        ['events' => $eventsSeq, 'trace' => $traceSeq, 'done' => $done] = $new;
+        /** @var TankState $tankState */
         $tankState = $done !== null && is_string($done->tank_state) ? json_decode($done->tank_state, true) : ['tanks' => [], 'prev' => null, 'refuel' => null];
-        $events = $this->events($user, $game, $eventsSeq);
+        /** @var JobState $jobState */
+        $jobState = $done !== null && is_string($done->job_state) ? json_decode($done->job_state, true) : JobBuilder::INITIAL_STATE;
+        $jobEventsSeq = $done === null ? 0 : self::int($done->job_events_seq);
 
-        DB::transaction(function () use ($user, $game, $events, $tankState, $done, $eventsSeq, $traceSeq) {
-            $tankState = $this->computeTankPrices($user, $game, $events, $tankState, $done === null ? 0 : self::int($done->trace_seq), $traceSeq);
-            $this->computeJobs($user, $game, $events);
-            DB::table('job_computations')->upsert(
-                ['user_id' => $user->id, 'game' => $game->value, 'events_seq' => $eventsSeq, 'trace_seq' => $traceSeq, 'tank_state' => json_encode($tankState, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)],
-                ['user_id', 'game'],
-            );
+        DB::transaction(function () use ($user, $game, $tankState, $jobState, $jobEventsSeq, $done, $eventsSeq, $traceSeq) {
+            $tankState = $this->computeTankPrices($user, $game, $tankState, $done === null ? 0 : self::int($done->trace_seq), $traceSeq);
+            [$jobState, $jobEventsSeq] = $this->computeJobs($user, $game, $jobState, $jobEventsSeq, $eventsSeq, $traceSeq);
+            DB::table('job_computations')->upsert([
+                'user_id' => $user->id, 'game' => $game->value, 'events_seq' => $eventsSeq, 'trace_seq' => $traceSeq,
+                'tank_state' => self::encode($tankState), 'job_events_seq' => $jobEventsSeq, 'job_state' => self::encode($jobState),
+            ], ['user_id', 'game']);
         });
 
         return true;
     }
 
     /**
-     * @param  list<array<string, mixed>>  $events
-     * @param  State  $state
-     * @return State
+     * @param  TankState  $state
+     * @return TankState
      */
-    private function computeTankPrices(User $user, Game $game, array $events, array $state, int $fromSeq, int $toSeq): array
+    private function computeTankPrices(User $user, Game $game, array $state, int $fromSeq, int $toSeq): array
     {
-        $vehicles = [];
-        foreach ($events as $e) {
-            if ($e['type'] === 'truck' && is_array($e['attrs'])) {
-                $vehicles[] = ['wall' => self::int($e['wall']), 'key' => TankPrices::vehicleKey($e['attrs']['id'] ?? null, $e['attrs']['license.plate'] ?? null)];
-            }
-        }
         /** @var list<array{0: float|int, 1: float|int, 2: string, 3: bool}> $places */
         $places = $this->namesFile($game, 'fuel_places');
-        $tanks = new TankPrices($state, $vehicles, $places, $this->fuelPrices($game));
+        $prices = $this->fuelPrices($game);
+        $points = DB::table('trace_points')->where('user_id', $user->id)->where('game', $game->value)->whereBetween('seq', [$fromSeq + 1, $toSeq]);
+        $firstWall = (clone $points)->orderBy('seq')->value('wall');
+        if (! is_string($firstWall)) {
+            return $state;
+        }
+        $vehicles = $this->vehicles($user, $game, $firstWall);
+        $tanks = new TankPrices($state, $vehicles, $places, $prices);
 
-        DB::table('trace_points')->where('user_id', $user->id)->where('game', $game->value)->whereBetween('seq', [$fromSeq + 1, $toSeq])
-            ->orderBy('seq')
-            ->chunk(1000, function ($rows) use ($tanks) {
-                $priced = [];
-                foreach ($rows as $row) {
-                    /** @var array{wall: int, game_time: int|null, fuel: float|int, odometer: float|int, x: float|int, z: float|int} $point */
-                    $point = json_decode(is_string($row->data) ? $row->data : '', true, flags: JSON_THROW_ON_ERROR);
-                    $priced[] = [...(array) $row, 'tank_price' => $tanks->add($point)];
-                }
-                DB::table('trace_points')->upsert($priced, ['user_id', 'game', 'seq'], ['tank_price']);
-            });
+        $points->orderBy('seq')->chunk(1000, function ($rows) use ($tanks) {
+            $priced = [];
+            foreach ($rows as $row) {
+                /** @var array{wall: int, game_time: int|null, fuel: float|int, odometer: float|int, x: float|int, z: float|int} $point */
+                $point = json_decode(is_string($row->data) ? $row->data : '', true, flags: JSON_THROW_ON_ERROR);
+                $priced[] = [...(array) $row, 'tank_price' => $tanks->add($point)];
+            }
+            DB::table('trace_points')->upsert($priced, ['user_id', 'game', 'seq'], ['tank_price']);
+        });
 
         $rows = array_map(fn ($r) => [
             'user_id' => $user->id, 'game' => $game->value, 'wall' => gmdate('Y-m-d H:i:s', $r['wall']), 'last_wall' => gmdate('Y-m-d H:i:s', $r['last_wall']),
@@ -99,45 +139,74 @@ class JobComputation
     }
 
     /**
-     * @param  list<array<string, mixed>>  $events
+     * Vehicle changes from the last one before the wall on, in the order of the events.
+     *
+     * @return list<array{wall: int, key: string}>
      */
-    private function computeJobs(User $user, Game $game, array $events): void
+    private function vehicles(User $user, Game $game, string $wall): array
     {
-        $trace = new Trace($user->id, $game);
-        $lastWall = $trace->last()['wall'] ?? 0;
-        $complete = DB::table('game_jobs')->where('user_id', $user->id)->where('game', $game->value)->where('complete', true)->pluck('id')->flip();
-        $builder = new JobBuilder($events, $trace);
-        $ids = [];
-        foreach ($builder->jobs() as $job) {
-            $ids[] = $job['id'];
-            if ($complete->has($job['id'])) {
-                continue;
+        $trucks = DB::table('game_events')->where('user_id', $user->id)->where('game', $game->value)->where('type', 'truck');
+        $fromSeq = (clone $trucks)->where('wall', '<=', $wall)->orderByDesc('wall')->orderByDesc('seq')->value('seq') ?? 0;
+        $vehicles = [];
+        foreach ($trucks->where('seq', '>=', $fromSeq)->orderBy('seq')->pluck('data') as $data) {
+            $event = self::decode($data);
+            $attrs = $event['attrs'] ?? null;
+            if (is_array($attrs)) {
+                $vehicles[] = ['wall' => self::int($event['wall']), 'key' => TankPrices::vehicleKey($attrs['id'] ?? null, $attrs['license.plate'] ?? null)];
             }
+        }
+
+        return $vehicles;
+    }
+
+    /**
+     * @param  JobState  $state
+     * @return array{JobState, int}
+     */
+    private function computeJobs(User $user, Game $game, array $state, int $fromSeq, int $toSeq, int $traceSeq): array
+    {
+        // Only the trace priced above, points stored meanwhile have no tank price yet.
+        $trace = new Trace($user->id, $game, $traceSeq);
+        $lastWall = $trace->last()['wall'] ?? 0;
+        $events = [];
+        $seqs = [];
+        foreach (DB::table('game_events')->where('user_id', $user->id)->where('game', $game->value)->whereBetween('seq', [$fromSeq + 1, $toSeq])->orderBy('seq')->get(['seq', 'data']) as $row) {
+            $events[] = self::decode($row->data);
+            $seqs[] = self::int($row->seq);
+        }
+        // Events after the arrived trace are processed again next time, a job state depends on the trace up to its events.
+        $persisted = 0;
+        while ($persisted < count($events) && $events[$persisted]['wall'] <= $lastWall) {
+            $persisted++;
+        }
+        $gameplay = fn (int $from, int $to) => array_values(array_map(self::decode(...), DB::table('game_events')->where('user_id', $user->id)->where('game', $game->value)->where('type', 'gameplay')
+            ->whereBetween('wall', [gmdate('Y-m-d H:i:s', $from), gmdate('Y-m-d H:i:s', $to)])->orderBy('seq')->pluck('data')->all()));
+        $result = (new JobBuilder($trace, $gameplay))->jobs($events, $persisted, $state);
+
+        foreach ($result['jobs'] as $job) {
             $j = ($job['compute'])();
             DB::table('game_jobs')->upsert([
                 'user_id' => $user->id, 'game' => $game->value, 'id' => $job['id'], 'source' => 'plugin',
                 ...array_intersect_key($j, array_flip(['kind', 'status', 'game_time', 'src_company', 'src_city', 'dst_company', 'dst_city', 'cargo', 'xp', 'revenue', 'km', 'truck', 'truck_name', 'mass', 'units'])),
                 'telemetry' => json_encode($j['telemetry'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION),
-                // The plugin sends events and trace separately, the trace up to the job end may still be on the way.
-                'complete' => in_array($job['end']['type'], ['delivered', 'cancelled'], true) && $lastWall >= $job['end']['wall'],
             ], ['user_id', 'game', 'id']);
         }
-        DB::table('game_jobs')->where('user_id', $user->id)->where('game', $game->value)->where('source', 'plugin')->whereNotIn('id', $ids)->delete();
+
+        return [$result['state'], $persisted > 0 ? $seqs[$persisted - 1] : $fromSeq];
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return array<string, mixed>
      */
-    private function events(User $user, Game $game, int $toSeq): array
+    private static function decode(mixed $data): array
     {
-        $events = [];
-        foreach (DB::table('game_events')->where('user_id', $user->id)->where('game', $game->value)->where('seq', '<=', $toSeq)->orderBy('seq')->pluck('data') as $data) {
-            /** @var array<string, mixed> $event */
-            $event = json_decode(is_string($data) ? $data : '', true, flags: JSON_THROW_ON_ERROR);
-            $events[] = $event;
-        }
+        /** @var array<string, mixed> */
+        return json_decode(is_string($data) ? $data : '', true, flags: JSON_THROW_ON_ERROR);
+    }
 
-        return $events;
+    private static function encode(mixed $value): string
+    {
+        return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
     }
 
     private static function int(mixed $value): int

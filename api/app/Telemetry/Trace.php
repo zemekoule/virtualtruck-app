@@ -8,10 +8,10 @@ use App\Enums\Game;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
-/** Trace points of one user and game, each with the tank_price computed by TankPrices. */
+/** Trace points of one user and game up to a seq, each with the tank_price computed by TankPrices. */
 class Trace
 {
-    public function __construct(private readonly int $userId, private readonly Game $game) {}
+    public function __construct(private readonly int $userId, private readonly Game $game, private readonly int $maxSeq = PHP_INT_MAX) {}
 
     /**
      * @return list<array<string, mixed>>
@@ -39,7 +39,7 @@ class Trace
 
     private function query(): Builder
     {
-        return DB::table('trace_points')->where('user_id', $this->userId)->where('game', $this->game->value);
+        return DB::table('trace_points')->where('user_id', $this->userId)->where('game', $this->game->value)->where('seq', '<=', $this->maxSeq);
     }
 
     /**

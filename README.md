@@ -116,12 +116,12 @@ docker compose run --rm -v "$HOME/Library/Application Support/virtualtruck/data:
 
 ### Zakázky a tankování
 
-Po každé přijaté dávce se po odeslání odpovědi (`defer`) přepočítají zakázky (`game_jobs`) a tankování (`refuels`) uživatele a hry, jen z toho, co přibylo: doručené a zrušené zakázky, jejichž stopa už celá dorazila, se znovu nepočítají a cena paliva v nádrži se počítá jen pro nové body stopy. Výpočet je port `telemetry_jobs` a `tank_prices` z `page/build.py` a dává stejná čísla (zaokrouhlení a součty jako Python). Pumpy a ceny paliva bere z `names/<hra>/` (`VIRTUALTRUCK_NAMES_DIR`).
+Po každé přijaté dávce se po odeslání odpovědi (`defer`) přepočítají zakázky (`game_jobs`) a tankování (`refuels`) uživatele a hry, jen z toho, co přibylo: čtou se jen nové události, rozjeté zakázky si výpočet pamatuje (`job_computations.job_state`), počítají se jen ukončené a rozjeté zakázky (pozastavená až po obnovení) a cena paliva v nádrži jen pro nové body stopy. Události, ke kterým ještě nedorazila stopa, se zpracují znovu v dalším běhu. Když výpočet už běží, další požadavek na něj nečeká a nová data spočítá běžící výpočet. Výpočet je port `telemetry_jobs` a `tank_prices` z `page/build.py` a dává stejná čísla (zaokrouhlení a součty jako Python). Pumpy a ceny paliva bere z `names/<hra>/` (`VIRTUALTRUCK_NAMES_DIR`).
 
-Ručně (např. po `ingest:import`):
+Ručně (např. po `ingest:import`; `--fresh` spočítá zakázky z pluginu znovu ze všech událostí, např. po ruční opravě událostí):
 
 ```sh
-docker compose run --rm api php artisan jobs:compute
+docker compose run --rm api php artisan jobs:compute [--fresh]
 ```
 
 ### Čtení dat

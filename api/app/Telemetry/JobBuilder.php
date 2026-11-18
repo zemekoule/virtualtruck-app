@@ -7,10 +7,15 @@ namespace App\Telemetry;
 /**
  * Jobs from the plugin events and trace, ported 1:1 from telemetry_jobs() in page/build.py.
  *
+ * Works through the events incrementally: the jobs started and not yet ended (and the current truck) are kept as a state between the runs.
+ *
  * @phpstan-type Row array<string, mixed>
+ * @phpstan-type State array{started: list<array{0: string, 1: Row}>, truck: mixed}
  */
 class JobBuilder
 {
+    public const INITIAL_STATE = ['started' => [], 'truck' => null];
+
     private const TRACE_POINTS_MAX = 500;
 
     private const SPEEDING_TOLERANCE_MS = 0.447;
@@ -36,44 +41,41 @@ class JobBuilder
     // The cancel event of a bus job is not known yet.
     private const JOB_END_EVENTS = ['job.delivered' => 'job', 'job.cancelled' => 'job', 'car_job.delivered' => 'car_job', 'car_job.cancelled' => 'car_job', 'bus_job.completed' => 'bus_job'];
 
-    /** @var list<Row> */
-    private array $incidents = [];
-
-    /** @var list<int> */
-    private array $transports = [];
-
     /**
-     * @param  list<Row>  $events
+     * @param  \Closure(int, int): list<Row>  $gameplayEvents  gameplay events with the wall in [from, to]
      */
-    public function __construct(private readonly array $events, private readonly Trace $trace)
-    {
-        foreach ($events as $e) {
-            if ($e['type'] === 'gameplay' && str_starts_with(self::str($e['id'] ?? null), 'player.')) {
-                $this->incidents[] = $e;
-                if (in_array($e['id'], ['player.use.ferry', 'player.use.train'], true)) {
-                    $this->transports[] = self::int($e['wall']);
-                }
-            }
-        }
-    }
+    public function __construct(private readonly Trace $trace, private readonly \Closure $gameplayEvents) {}
 
     /**
-     * Every job found in the events, without computing it.
+     * Jobs ended in the events and the jobs still open, without computing them; an open job is left out when nothing could have changed it
+     * (suspended earlier and untouched since).
      *
-     * @return list<array{id: string, end: Row, compute: callable(): Row}>
+     * @param  list<Row>  $events  events after the state
+     * @param  int  $persisted  how many of the events go into the returned state (the trace up to them has arrived)
+     * @param  State  $state
+     * @return array{jobs: list<array{id: string, end: Row, compute: callable(): Row}>, state: State}
      */
-    public function jobs(): array
+    public function jobs(array $events, int $persisted, array $state): array
     {
         $started = [];
+        foreach ($state['started'] as [$key, $job]) {
+            $started[$key] = $job;
+        }
+        $truck = $state['truck'];
+        $touched = [];
         $jobs = [];
-        $truck = null;
-        foreach ($this->events as $e) {
+        $snapshot = null;
+        foreach ($events as $i => $e) {
+            if ($i === $persisted) {
+                $snapshot = self::state($started, $truck);
+            }
             $type = $e['type'];
             if ($type === 'truck') {
                 $truck = $e['attrs'] ?? null;
                 foreach ($started as $key => $state) {
                     if (! self::truthy($state['suspended'])) {
                         $started[$key]['truck'] = $e['attrs'] ?? null;
+                        $touched[$key] = true;
                     }
                 }
 
@@ -86,6 +88,7 @@ class JobBuilder
                         continue;
                     }
                     $started[$key]['trailers'] = [$attrs];
+                    $touched[$key] = true;
                     if (self::truthy($attrs['cargo.accessory.id'] ?? null)) {
                         $started[$key]['trailer_cargo'] = true;
                     } elseif (self::truthy($state['trailer_cargo']) && $state['config'] === 'job' && self::truthy($state['cargo_loaded'])) {
@@ -104,6 +107,7 @@ class JobBuilder
                 foreach ($started as $otherKey => $other) {
                     if ($otherKey !== $key && $other['config'] === $type && ! self::truthy($other['suspended'])) {
                         $started[$otherKey]['suspended'] = ['from' => self::firstTruthy($other['unloaded_at'], $this->suspensionStart($other, self::int($e['wall'])))];
+                        $touched[$otherKey] = true;
                     }
                 }
                 $started[$key] ??= [
@@ -111,10 +115,11 @@ class JobBuilder
                     'suspended' => null, 'suspensions' => [], 'trailers' => [], 'trailer_cargo' => false, 'truck' => $truck,
                 ];
                 $started[$key]['attrs'] = $attrs;
+                $touched[$key] = true;
                 $started[$key]['cargo_loaded'] = $attrs['cargo.loaded'] ?? null;
                 $started[$key]['unloaded_at'] = null;
                 if (self::truthy($started[$key]['suspended'])) {
-                    $started[$key]['suspensions'][] = [...self::row($started[$key]['suspended']), 'to' => $e['wall']];
+                    $started[$key]['suspensions'] = [...self::row($started[$key]['suspensions']), [...self::row($started[$key]['suspended']), 'to' => $e['wall']]];
                     $started[$key]['suspended'] = null;
                 }
                 if (($attrs['cargo.loaded'] ?? null) === false) {
@@ -136,7 +141,11 @@ class JobBuilder
             $end = ['wall' => $e['wall'], 'game_time' => $e['game_time'], 'type' => str_ends_with(self::str($e['id'] ?? null), '.cancelled') ? 'cancelled' : 'delivered'];
             $jobs[] = $this->job($config, $jobId, $state, self::row($e[$config]), self::row($e['attrs'] ?? null), $end, $e['truck'] ?? null, self::firstTruthy($e['trailers'] ?? null, []));
         }
-        foreach ($started as $state) {
+        $snapshot ??= self::state($started, $truck);
+        foreach ($started as $key => $state) {
+            if (self::truthy($state['suspended']) && ! isset($touched[$key])) {
+                continue;
+            }
             if (self::truthy($state['suspended'])) {
                 $from = self::int(self::row($state['suspended'])['from']);
                 $last = $this->trace->lastAtOrBefore($from) ?? [];
@@ -149,7 +158,21 @@ class JobBuilder
             $jobs[] = $this->job(self::str($state['config']), $state['id'], $state, self::row($state['attrs']), [], $end, $state['truck'], $state['trailers']);
         }
 
-        return $jobs;
+        return ['jobs' => $jobs, 'state' => $snapshot];
+    }
+
+    /**
+     * @param  array<string, Row>  $started
+     * @return State
+     */
+    private static function state(array $started, mixed $truck): array
+    {
+        $list = [];
+        foreach ($started as $key => $job) {
+            $list[] = [(string) $key, $job];
+        }
+
+        return ['started' => $list, 'truck' => $truck];
     }
 
     /**
@@ -185,7 +208,19 @@ class JobBuilder
         /** @var list<Row> $suspensions */
         $suspensions = $state['suspensions'];
         $points = $this->jobPoints($start, $endWall, $suspensions);
-        $incidents = array_values(array_filter($this->incidents, fn ($i) => $start <= $i['wall'] && $i['wall'] <= $endWall && ! self::suspendedAt($suspensions, self::int($i['wall']))));
+        $incidents = [];
+        $transports = [];
+        foreach (($this->gameplayEvents)($start, $endWall) as $e) {
+            if (! str_starts_with(self::str($e['id'] ?? null), 'player.')) {
+                continue;
+            }
+            if (in_array($e['id'], ['player.use.ferry', 'player.use.train'], true)) {
+                $transports[] = self::int($e['wall']);
+            }
+            if (! self::suspendedAt($suspensions, self::int($e['wall']))) {
+                $incidents[] = $e;
+            }
+        }
         $deadline = self::get($a, 'delivery.time') !== self::NO_DEADLINE ? self::get($a, 'delivery.time') : null;
         $stages = $config === 'bus_job' ? $this->busStages($a) : [];
         $finished = in_array($end['type'], ['delivered', 'cancelled'], true);
@@ -223,7 +258,7 @@ class JobBuilder
                 'auto_load' => self::get($r, 'auto.load.used'),
                 'incidents' => array_map(fn ($i) => ['id' => $i['id'], 'attrs' => $i['attrs']], $incidents),
                 'trace' => $this->traceSummary($points, $loaded),
-                'timeline' => $this->timeline($points, $state, [...$end, 'deadline' => $deadline], $loaded, $incidents, $suspensions, $stages),
+                'timeline' => $this->timeline($points, $state, [...$end, 'deadline' => $deadline], $loaded, $incidents, $transports, $suspensions, $stages),
                 ...($config === 'bus_job' ? ['bus' => ['satisfaction' => self::get($r, 'passenger.satisfaction'), 'stages' => $stages]] : []),
             ],
         ];
@@ -458,11 +493,12 @@ class JobBuilder
      * @param  Row  $end
      * @param  Row|null  $loaded
      * @param  list<Row>  $incidents
+     * @param  list<int>  $transports  walls of the ferry and train transports
      * @param  list<Row>  $suspensions
      * @param  list<array{from: Row, to: Row, departure: array{planned: mixed, actual: mixed}, arrival: array{planned: mixed, actual: mixed}, entering: mixed, leaving: mixed}>  $stages
      * @return list<Row>
      */
-    private function timeline(array $points, array $start, array $end, ?array $loaded, array $incidents, array $suspensions, array $stages): array
+    private function timeline(array $points, array $start, array $end, ?array $loaded, array $incidents, array $transports, array $suspensions, array $stages): array
     {
         $at = function (mixed $wall, mixed $gameTime) use ($points): array {
             $km = 0;
@@ -509,7 +545,7 @@ class JobBuilder
         }
         foreach ($jumps as $pair) {
             [$a, $b] = [$points[$pair[0]], $points[$pair[1]]];
-            if ($pair === $loadingJump || array_filter($this->transports, fn ($t) => $a['wall'] <= $t && $t <= $b['wall']) !== []) {
+            if ($pair === $loadingJump || array_filter($transports, fn ($t) => $a['wall'] <= $t && $t <= $b['wall']) !== []) {
                 continue;
             }
             // The game skips the wait for a bus departure.
@@ -550,7 +586,7 @@ class JobBuilder
         }
         foreach ($incidents as $incident) {
             $ride = null;
-            if (in_array($incident['wall'], $this->transports, true)) {
+            if (in_array($incident['wall'], $transports, true)) {
                 foreach ($jumps as $pair) {
                     if ($points[$pair[0]]['wall'] <= $incident['wall'] && $incident['wall'] <= $points[$pair[1]]['wall']) {
                         $ride = $pair;
