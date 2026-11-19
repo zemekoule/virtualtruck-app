@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { login, register } from './api';
+import { login, register, twoFactorChallenge } from './api';
 
 export function Login({ onLogin }: { onLogin: () => void }) {
 	const [registering, setRegistering] = useState(false);
-	const [form, setForm] = useState({ name: '', email: '', password: '', passwordConfirmation: '' });
+	const [twoFactor, setTwoFactor] = useState(false);
+	const [recovery, setRecovery] = useState(false);
+	const [form, setForm] = useState({ name: '', email: '', password: '', passwordConfirmation: '', code: '' });
 	const [error, setError] = useState('');
 	const [busy, setBusy] = useState(false);
 	const field = (key: keyof typeof form) => ({ value: form[key], onChange: (e: { target: { value: string } }) => setForm(f => ({ ...f, [key]: e.target.value })) });
@@ -12,10 +14,33 @@ export function Login({ onLogin }: { onLogin: () => void }) {
 		e.preventDefault();
 		setBusy(true);
 		setError('');
-		(registering ? register(form.name, form.email, form.password, form.passwordConfirmation) : login(form.email, form.password))
-			.then(onLogin, (e: Error) => setError(e.message))
-			.finally(() => setBusy(false));
+		const done = twoFactor
+			? twoFactorChallenge(recovery ? { recovery_code: form.code.trim() } : { code: form.code.trim() }).then(onLogin)
+			: registering
+				? register(form.name, form.email, form.password, form.passwordConfirmation).then(onLogin)
+				: login(form.email, form.password).then(waits => waits ? setTwoFactor(true) : onLogin());
+		done.catch((e: Error) => setError(e.message)).finally(() => setBusy(false));
 	};
+
+	if (twoFactor) {
+		return (
+			<form className="card login" onSubmit={submit}>
+				<h1>Dvoufázové ověření</h1>
+				<label>
+					{recovery ? 'Záložní kód' : 'Kód z aplikace'}
+					<input autoComplete="one-time-code" inputMode={recovery ? 'text' : 'numeric'} required autoFocus {...field('code')} />
+				</label>
+				{error && <p className="bad">{error}</p>}
+				<button type="submit" className="link-button" disabled={busy}>Ověřit</button>
+				<button type="button" className="text-button" onClick={() => { setRecovery(!recovery); setForm(f => ({ ...f, code: '' })); setError(''); }}>
+					{recovery ? 'Použít kód z aplikace' : 'Nemám telefon, použít záložní kód'}
+				</button>
+				<button type="button" className="text-button" onClick={() => { setTwoFactor(false); setRecovery(false); setForm(f => ({ ...f, code: '' })); setError(''); }}>
+					Zpět na přihlášení
+				</button>
+			</form>
+		);
+	}
 
 	return (
 		<form className="card login" onSubmit={submit}>
