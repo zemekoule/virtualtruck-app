@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { createToken, deleteToken, tokens, type Token } from '../api';
 import { wallTime } from '../format';
+import { PasswordChange, TwoFactor } from './Account';
 
 const time = (iso: string | null) => iso ? wallTime(Date.parse(iso) / 1000) : 'nikdy';
 
@@ -40,6 +41,10 @@ export function Settings() {
 	return (
 		<main className="page">
 			<h1>Nastavení</h1>
+			<h2>Heslo</h2>
+			<PasswordChange />
+			<h2>Dvoufázové ověření</h2>
+			<TwoFactor />
 			<h2>Tokeny pro plugin</h2>
 			<p className="muted lead">Plugin posílá data s tokenem ze souboru <code>~/Library/Application Support/virtualtruck/config</code>. Token smí jen posílat data, číst je nebo vytvořit další token nejde.</p>
 			{error && <p className="bad">{error}</p>}

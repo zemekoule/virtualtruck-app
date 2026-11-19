@@ -90,6 +90,9 @@ class TokenTest extends TestCase
             'list tokens' => ['GET', '/api/tokens'],
             'create a token' => ['POST', '/api/tokens'],
             'delete a token' => ['DELETE', '/api/tokens/1'],
+            'change the password' => ['PUT', '/api/user/password'],
+            'confirm the password' => ['POST', '/api/user/confirm-password'],
+            'disable two-factor' => ['DELETE', '/api/user/two-factor-authentication'],
         ];
     }
 }

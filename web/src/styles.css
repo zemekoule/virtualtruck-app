@@ -192,10 +192,16 @@ table.wear td { vertical-align: top; min-width: 110px; }
 
 .login { max-width: 360px; margin: 64px auto; }
 .login h1 { margin: 0; font-size: 20px; }
-.login label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; }
-.login input { padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px; color: var(--fg); font: inherit; }
-.login input:focus { outline: 0; border-color: var(--accent); }
+.login label, .form label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; }
+.login input, .form input { padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px; color: var(--fg); font: inherit; }
+.login input:focus, .form input:focus { outline: 0; border-color: var(--accent); }
 .login p { margin: 0; }
+.form { display: flex; flex-direction: column; gap: 12px; max-width: 360px; }
+.form p { margin: 0; }
+.form button { align-self: flex-start; }
+.buttons { display: flex; gap: 8px; }
+.qr { width: 192px; height: 192px; padding: 8px; background: #fff; border-radius: 8px; }
+.codes { margin: 0; padding: 12px; columns: 2; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px; }
 .text-button { padding: 0; border: 0; background: none; color: var(--muted); font-size: 13px; }
 .text-button:hover { color: var(--accent); }
 .notice { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }

@@ -6,7 +6,7 @@ export class Unauthenticated extends Error {
 	}
 }
 
-export type User = { name: string; email: string };
+export type User = { name: string; email: string; two_factor_confirmed_at: string | null };
 
 function xsrfToken() {
 	const cookie = document.cookie.split('; ').find(c => c.startsWith('XSRF-TOKEN='));
@@ -20,6 +20,7 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
 		headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}), ...options.headers },
 	});
 	if (response.status === 401) throw new Unauthenticated();
+	if (response.status === 429) throw new Error('Příliš mnoho pokusů, zkus to znovu za minutu.');
 	const text = await response.text();
 	if (!response.ok) throw new Error(response.status === 422 ? validationMessage(text) : `${response.status} ${text}`);
 	return text ? JSON.parse(text) : (null as T);
@@ -42,10 +43,14 @@ export async function currentUser(): Promise<User | null> {
 // Sanctum sets the XSRF-TOKEN cookie, which the session login and registration need.
 const csrfCookie = () => api('sanctum/csrf-cookie');
 
+/** @returns whether the login waits for a two-factor code */
 export async function login(email: string, password: string) {
 	await csrfCookie();
-	await api('login', { method: 'POST', body: JSON.stringify({ email, password, remember: true }) });
+	const r = await api<{ two_factor: boolean }>('login', { method: 'POST', body: JSON.stringify({ email, password, remember: true }) });
+	return r.two_factor;
 }
+
+export const twoFactorChallenge = (input: { code: string } | { recovery_code: string }) => api('two-factor-challenge', { method: 'POST', body: JSON.stringify(input) });
 
 export async function register(name: string, email: string, password: string, passwordConfirmation: string) {
 	await csrfCookie();
@@ -55,6 +60,20 @@ export async function register(name: string, email: string, password: string, pa
 }
 
 export const logout = () => api('logout', { method: 'POST' });
+
+const post = (path: string, body: object = {}) => api(path, { method: 'POST', body: JSON.stringify(body) });
+export const updatePassword = (current_password: string, password: string, password_confirmation: string) =>
+	api('user/password', { method: 'PUT', body: JSON.stringify({ current_password, password, password_confirmation }) });
+// Changes of two-factor authentication need a recently confirmed password.
+export const confirmPassword = (password: string) => post('user/confirm-password', { password });
+// Forced, so a setup left unfinished gets a new secret.
+export const enableTwoFactor = () => post('user/two-factor-authentication', { force: true });
+export const twoFactorSetup = () => Promise.all([api<{ svg: string }>('user/two-factor-qr-code'), api<{ secretKey: string }>('user/two-factor-secret-key')])
+	.then(([qr, key]) => ({ svg: qr.svg, secretKey: key.secretKey }));
+export const confirmTwoFactor = (code: string) => post('user/confirmed-two-factor-authentication', { code });
+export const recoveryCodes = () => api<string[]>('user/two-factor-recovery-codes');
+export const regenerateRecoveryCodes = () => post('user/two-factor-recovery-codes');
+export const disableTwoFactor = () => api('user/two-factor-authentication', { method: 'DELETE' });
 
 const NAME_FILES = import.meta.glob<Record<string, string>>('../../names/*/{companies,cities,cargo}.json', { import: 'default' });
 const names = (game: GameId, kind: Exclude<NameKind, 'trucks'>) => NAME_FILES[`../../names/${game}/${kind}.json`]();

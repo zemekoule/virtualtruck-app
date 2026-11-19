@@ -61,7 +61,7 @@ Mapa ve stránce je MapLibre se stylem z demo aplikace [TruckSim Maps](https://g
 
 ## API
 
-Všechny cesty jsou pod `/api` (i `/api/login`, `/api/register`, `/api/logout` a `/api/sanctum/csrf-cookie`). Registrace jde vypnout (`VIRTUALTRUCK_REGISTRATION=false`), účet pak založí `php artisan user:create <e-mail> <jméno>`.
+Všechny cesty jsou pod `/api` (i `/api/login`, `/api/register`, `/api/logout` a `/api/sanctum/csrf-cookie`). Registrace jde vypnout (`VIRTUALTRUCK_REGISTRATION=false`), účet pak založí `php artisan user:create <e-mail> <jméno>`. Změna hesla a volitelné dvoufázové ověření jsou cesty Fortify (`/api/user/password`, `/api/user/two-factor-*`, `/api/two-factor-challenge`).
 
 ### Data z pluginu
 
