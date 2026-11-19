@@ -10,6 +10,7 @@ export function Settings() {
 	const [created, setCreated] = useState<string>();
 	const [error, setError] = useState('');
 	const [busy, setBusy] = useState(false);
+	const [copied, setCopied] = useState(false);
 	const load = useCallback(() => tokens().then(setList, (e: Error) => setError(e.message)), []);
 	useEffect(() => void load(), [load]);
 
@@ -19,6 +20,7 @@ export function Settings() {
 		setBusy(true);
 		createToken(name).then(t => {
 			setCreated(t.token);
+			setCopied(false);
 			return load();
 		}, (e: Error) => setError(e.message)).finally(() => setBusy(false));
 	};
@@ -29,16 +31,23 @@ export function Settings() {
 		deleteToken(t.id).then(load, (e: Error) => setError(e.message));
 	};
 
+	const config = created && `url=${location.origin}\ntoken=${created}`;
+	const copy = () => {
+		if (!config) return;
+		navigator.clipboard.writeText(config).then(() => setCopied(true), () => setError('Kopírování se nepovedlo, označ text a zkopíruj ho ručně.'));
+	};
+
 	return (
 		<main className="page">
 			<h1>Nastavení</h1>
 			<h2>Tokeny pro plugin</h2>
 			<p className="muted lead">Plugin posílá data s tokenem ze souboru <code>~/Library/Application Support/virtualtruck/config</code>. Token smí jen posílat data, číst je nebo vytvořit další token nejde.</p>
 			{error && <p className="bad">{error}</p>}
-			{created && (
+			{config && (
 				<div className="notice">
-					<p>Nový token se ukáže jen teď. Zapiš ho do <code>config</code>:</p>
-					<pre className="config">{`url=${location.origin}\ntoken=${created}`}</pre>
+					<p>Token uvidíš jen teď. Ulož celý tento obsah do souboru <code>~/Library/Application Support/virtualtruck/config</code>:</p>
+					<pre className="config">{config}</pre>
+					<button type="button" className="link-button" onClick={copy}>{copied ? 'Zkopírováno' : 'Zkopírovat'}</button>
 				</div>
 			)}
 			{list && (list.length ? (

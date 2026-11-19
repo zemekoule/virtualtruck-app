@@ -200,6 +200,7 @@ table.wear td { vertical-align: top; min-width: 110px; }
 .text-button:hover { color: var(--accent); }
 .notice { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .notice p { margin: 0; }
+.notice button { align-self: flex-start; }
 .config { margin: 0; padding: 12px; overflow-x: auto; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px; user-select: all; }
 .token-form { display: flex; gap: 8px; margin-top: 16px; }
 .token-form input { padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px; color: var(--fg); font: inherit; }
