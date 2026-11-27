@@ -159,7 +159,7 @@ class JobComputationTest extends TestCase
         $job = $this->job();
         $this->assertSame(['delivered', 5000, 300, 202, 'man.tgx', 'praha', 'brno'], [$job['status'], $job['revenue'], $job['xp'], $job['km'], $job['truck'], $job['src_city'], $job['dst_city']]);
         $telemetry = $this->telemetry();
-        // The fuel in the tank before the first refuel gets its price: 30 l × 2.0.
+        // The fuel from the start and the refuel both cost 2.0: 30 l × 2.0.
         $this->assertSame(['driven_km' => 4.8, 'fuel_used' => 30, 'fuel_cost' => 60], array_intersect_key($telemetry['trace'], array_flip(['driven_km', 'fuel_used', 'fuel_cost'])));
         $this->assertSame(['start', 'delivered'], array_column($telemetry['timeline'], 'type'));
 
@@ -284,6 +284,16 @@ class JobComputationTest extends TestCase
         $this->assertSame([110.0], $refuels->pluck('litres')->all());
     }
 
+    public function test_fuel_before_the_first_refuel_costs_the_price_where_the_vehicle_first_drives(): void
+    {
+        $this->send(DataFile::Events, [...$this->takeJob(), $this->delivered(20)]);
+        $this->send(DataFile::Trace, [$this->point(10, 0, 200, 0, 1002), $this->point(15, 3000, 190, 3, 1003), $this->point(20, 6000, 170, 6, 1004)]);
+        $this->compute();
+
+        $this->assertSame(['fuel_used' => 30, 'fuel_cost' => 60], array_intersect_key($this->telemetry()['trace'], array_flip(['fuel_used', 'fuel_cost'])));
+        $this->assertSame(0, DB::table('refuels')->count());
+    }
+
     public function test_refuel_in_a_country_without_fuel_price_stops_the_computation(): void
     {
         file_put_contents("{$this->namesDir}/eut2/fuel_prices.json", json_encode([]));
@@ -323,18 +333,22 @@ class JobComputationTest extends TestCase
         $this->assertSame([5000, 4.8], [$this->job()['revenue'], $this->telemetry()['trace']['driven_km']]);
     }
 
-    public function test_fresh_computation_forgets_the_jobs_computed_before(): void
+    public function test_fresh_computation_forgets_the_jobs_and_fuel_prices_computed_before(): void
     {
         $this->send(DataFile::Events, [...$this->takeJob(), $this->delivered(20)]);
         $this->send(DataFile::Trace, $this->trace());
         $this->compute();
         DB::table('game_jobs')->update(['revenue' => 1]);
+        DB::table('refuels')->update(['price' => 9]);
+        DB::table('trace_points')->update(['tank_price' => null]);
         DB::table('game_jobs')->insert(['user_id' => $this->user->id, 'game' => 'eut2', 'id' => 'gone', 'source' => 'plugin', 'kind' => 'truck', 'status' => 'running', 'game_time' => 0]);
 
         $this->assertSame(0, Artisan::call('jobs:compute', ['--fresh' => true]));
 
         $this->assertSame(['100'], DB::table('game_jobs')->pluck('id')->all());
         $this->assertSame(5000, $this->job()['revenue']);
+        $this->assertSame([2.0], DB::table('refuels')->pluck('price')->all());
+        $this->assertSame(0, DB::table('trace_points')->whereNull('tank_price')->count());
     }
 
     public function test_trace_ends_at_the_priced_points(): void
