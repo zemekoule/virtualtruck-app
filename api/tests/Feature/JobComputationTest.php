@@ -93,7 +93,7 @@ class JobComputationTest extends TestCase
     private function takeJob(): array
     {
         return [
-            ['wall' => self::T, 'game_time' => null, 'type' => 'truck', 'attrs' => ['brand_id' => 'man', 'brand' => 'MAN', 'id' => 'vehicle.man.tgx', 'name' => 'TGX']],
+            ['wall' => self::T, 'game_time' => null, 'type' => 'truck', 'attrs' => ['brand_id' => 'man', 'brand' => 'MAN', 'id' => 'vehicle.man.tgx', 'name' => 'TGX', 'license.plate' => ' 9A5698']],
             ['wall' => self::T + 10, 'game_time' => 1002, 'type' => 'job', 'job_id' => '100', 'attrs' => $this->jobAttrs()],
         ];
     }
@@ -106,7 +106,7 @@ class JobComputationTest extends TestCase
         return [
             'wall' => self::T + $second, 'game_time' => 1100, 'type' => 'gameplay', 'id' => 'job.delivered', 'job_id' => '100', 'job' => $this->jobAttrs(),
             'attrs' => ['revenue' => 5000, 'earned.xp' => 300, 'distance.km' => 201.5, 'cargo.damage' => 0, 'auto.park.used' => false, 'auto.load.used' => true],
-            'truck' => ['brand_id' => 'man', 'brand' => 'MAN', 'id' => 'vehicle.man.tgx', 'name' => 'TGX'],
+            'truck' => ['brand_id' => 'man', 'brand' => 'MAN', 'id' => 'vehicle.man.tgx', 'name' => 'TGX', 'license.plate' => ' 9A5698'],
         ];
     }
 
@@ -139,14 +139,14 @@ class JobComputationTest extends TestCase
     }
 
     /**
-     * @return array{end: int, trace: array<string, mixed>, timeline: list<array<string, mixed>>}
+     * @return array{end: int, plate: string|null, trace: array<string, mixed>, timeline: list<array<string, mixed>>}
      */
     private function telemetry(): array
     {
         $telemetry = $this->job()['telemetry'];
         $this->assertIsString($telemetry);
 
-        /** @var array{end: int, trace: array<string, mixed>, timeline: list<array<string, mixed>>} */
+        /** @var array{end: int, plate: string|null, trace: array<string, mixed>, timeline: list<array<string, mixed>>} */
         return json_decode($telemetry, true);
     }
 
@@ -167,6 +167,7 @@ class JobComputationTest extends TestCase
         $this->assertNotNull($refuel);
         $this->assertSame([100.0, 'czech', 2.0, 'man.tgx'], [$refuel->litres, $refuel->country, $refuel->price, $refuel->truck]);
         $this->assertSame('MAN TGX', $job['truck_name']);
+        $this->assertSame('9A5698', $telemetry['plate']);
     }
 
     public function test_job_stays_incomplete_until_its_trace_arrives(): void

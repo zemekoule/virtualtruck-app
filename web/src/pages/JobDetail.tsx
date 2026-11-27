@@ -175,12 +175,12 @@ export function JobDetail() {
 				{j.kind === 'bus'
 					? <>
 						<h1>{busStops(j).map((s, i) => <span key={i}>{i > 0 && ' → '}{s.type === 'city' ? cityLink(s.id) : s.name}</span>)}</h1>
-						<div className="cargo-line">{[`${fmt(passengers(j))} cestujících`, f.truck(j.truck)].join(' · ')}</div>
+						<div className="cargo-line">{[`${fmt(passengers(j))} cestujících`, f.vehicle(j.truck, t.plate)].join(' · ')}</div>
 					</>
 					: <>
 						<h1>{cityLink(j.src_city)} → {cityLink(j.dst_city)}</h1>
 						<div className="muted">{f.company(j.src_company)} → {f.company(j.dst_company)}</div>
-						<div className="cargo-line">{[f.cargo(j.cargo), j.kind === 'truck' && j.mass ? `${(j.mass / 1000).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} t` : '', f.truck(j.truck)].filter(Boolean).join(' · ')}</div>
+						<div className="cargo-line">{[f.cargo(j.cargo), j.kind === 'truck' && j.mass ? `${(j.mass / 1000).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} t` : '', f.vehicle(j.truck, t.plate)].filter(Boolean).join(' · ')}</div>
 					</>}
 
 				<div className="grid-stats">
