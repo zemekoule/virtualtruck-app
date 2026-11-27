@@ -27,7 +27,7 @@ docker compose run --rm api php artisan migrate
 
 Přihlášení funguje jen na adrese `localhost:5180` (`SANCTUM_STATEFUL_DOMAINS` v `api/.env`); Vite přeposílá `/api` na API, aby byla session cookie na stejné adrese jako stránka.
 
-Patch submodulu mění import `maplibre-gl` (verze 6 nemá výchozí export, který kód mapy používá) a přidává Jižní Dakotu mezi vydaná DLC (jinak styl mapy skrývá silnice na hranicích s ní). Po změně patche: `git -C tools/trucksim-maps checkout -- packages` a znovu `apply`.
+Patch submodulu mění import `maplibre-gl` (verze 6 nemá výchozí export, který kód mapy používá). Po změně patche: `git -C tools/trucksim-maps checkout -- packages` a znovu `apply`.
 
 Kontroly:
 

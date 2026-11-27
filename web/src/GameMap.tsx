@@ -1,4 +1,5 @@
 import { fromAtsCoordsToWgs84, fromEts2CoordsToWgs84 } from '@truckermudgeon/map/projections';
+import { BaseMapStyle } from '@truckermudgeon/ui/BaseMapStyle';
 import { GameMapStyle } from '@truckermudgeon/ui/GameMapStyle';
 import type { FeatureCollection } from 'geojson';
 import { setWorkerUrl, type StyleSpecification } from 'maplibre-gl';
@@ -14,8 +15,7 @@ const MAP_STYLE: StyleSpecification = {
 	// MapLibre needs an absolute sprite URL.
 	sprite: `${window.location.origin}/tiles/sprites`,
 	sources: {},
-	// Land colour of the dark mode in tools/trucksim-maps (BaseMapStyle), without its real-world base map.
-	layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#1a1a1a' } }],
+	layers: [],
 };
 
 // MapLibre looks for its worker next to its own file, which Vite moves when it bundles the library.
@@ -62,6 +62,7 @@ export function GameMap({ game, routes, fitTo, padding, children }: { game: Game
 			initialViewState={{ bounds, fitBoundsOptions: { padding: fitPadding, maxZoom: 12 } }}
 			style={{ position: 'absolute', inset: 0 }}
 		>
+			<BaseMapStyle tileRootUrl={`${window.location.origin}/tiles`} mode="dark" />
 			<GameMapStyle game={TILE_GAME[game]} tileRootUrl={`${window.location.origin}/tiles`} mode="dark" />
 			<Source id="routes" type="geojson" data={data}>
 				<Layer id="route-glow" type="line" filter={['==', ['get', 'part'], 'loaded']} layout={{ 'line-cap': 'round', 'line-join': 'round' }} paint={{ 'line-color': '#f2a93b', 'line-width': 12, 'line-opacity': 0.2 }} />
