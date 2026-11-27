@@ -9,3 +9,8 @@ declare module '@truckermudgeon/ui/GameMapStyle' {
 	import type { ReactNode } from 'react';
 	export function GameMapStyle(props: { game: 'ats' | 'ets2'; tileRootUrl: string; mode?: 'light' | 'dark'; children?: ReactNode }): ReactNode;
 }
+
+declare module '@truckermudgeon/ui/BaseMapStyle' {
+	import type { ReactNode } from 'react';
+	export function BaseMapStyle(props: { tileRootUrl: string; mode?: 'light' | 'dark'; children?: ReactNode }): ReactNode;
+}

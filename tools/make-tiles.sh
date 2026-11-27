@@ -20,6 +20,9 @@ generator() { ./node_modules/.bin/tsx packages/clis/generator/index.ts "$@"; }
 ./node_modules/.bin/parser -i "$STEAM_GAMES/Euro Truck Simulator 2" -o "$WORK/eut2"
 
 mkdir -p "$OUT_DIR"
+# Real-world base layer (sea, country and state borders), as in the Makefile of tools/trucksim-maps.
+RESOURCES=packages/clis/generator/resources
+tippecanoe -Z4 -z8 -y name -b 10 -X --force --quiet -o "$OUT_DIR/world.pmtiles" "$RESOURCES/water.geojson" "$RESOURCES/countries.geojson" "$RESOURCES/states.geojson"
 for game in "usa ats" "europe eut2"; do
 	read -r map dir <<< "$game"
 	generator map -h -m "$map" -i "$WORK/$dir" -o "$OUT_DIR" --dataOverridesPath packages/clis/generator/resources/trucksim-overrides.json
