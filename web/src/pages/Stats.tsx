@@ -1,19 +1,29 @@
 import { fmt, percent, plural, useGame, wallTime } from '../format';
 import { UNFINISHED, WEAR } from '../jobText';
-import type { RecordedJob } from '../types';
+import type { Job, RecordedJob } from '../types';
 
 type Vehicle = { truck: string; plate: string | null; jobs: number; km: number; litres: number; capacity: number | null };
 
-// Model and plate: vehicles of the same model are told apart by the plate (plugin >= 1.9.0).
-const vehicleKey = (truck: string, plate: string | null | undefined) => JSON.stringify([truck, plate ?? null]);
+const vehicleKey = (truck: string, plate: string | null) => JSON.stringify([truck, plate]);
+
+// Jobs from plugins < 1.9.0 have no plate: a model with a single known plate is taken as that vehicle.
+function plateOf(jobs: Job[]) {
+	const plates = new Map<string, Set<string>>();
+	for (const j of jobs) if (j.truck && j.telemetry?.plate) plates.set(j.truck, (plates.get(j.truck) ?? new Set()).add(j.telemetry.plate));
+	return (j: Job) => {
+		const known = plates.get(j.truck ?? '');
+		return j.telemetry?.plate ?? (known?.size === 1 ? [...known][0] : null);
+	};
+}
 
 function vehicles(jobs: RecordedJob[]) {
+	const plate = plateOf(jobs);
 	const byId = new Map<string, Vehicle>();
 	for (const j of [...jobs].sort((a, b) => a.telemetry.end - b.telemetry.end)) {
 		const trace = j.telemetry.trace;
 		if (!j.truck) continue;
-		const key = vehicleKey(j.truck, j.telemetry.plate);
-		const v = byId.get(key) ?? { truck: j.truck, plate: j.telemetry.plate ?? null, jobs: 0, km: 0, litres: 0, capacity: null };
+		const key = vehicleKey(j.truck, plate(j));
+		const v = byId.get(key) ?? { truck: j.truck, plate: plate(j), jobs: 0, km: 0, litres: 0, capacity: null };
 		byId.set(key, v);
 		// The newest known tank wins: the vehicle may have been upgraded since.
 		v.capacity = j.telemetry.fuel_capacity ?? v.capacity;
@@ -68,12 +78,13 @@ const PARTS = ['wear_wheels', 'wear_engine', 'wear_transmission', 'wear_chassis'
 
 function Wear() {
 	const { data, f } = useGame();
+	const plate = plateOf(data.jobs);
 	const latest = new Map<string, { truck: string; plate: string | null; wear: Record<string, number>; at: number }>();
 	for (const j of data.jobs) {
 		const wear = j.telemetry?.trace?.wear_end;
 		if (!j.truck || !wear) continue;
-		const key = vehicleKey(j.truck, j.telemetry!.plate);
-		if (j.telemetry!.end > (latest.get(key)?.at ?? 0)) latest.set(key, { truck: j.truck, plate: j.telemetry!.plate ?? null, wear, at: j.telemetry!.end });
+		const key = vehicleKey(j.truck, plate(j));
+		if (j.telemetry!.end > (latest.get(key)?.at ?? 0)) latest.set(key, { truck: j.truck, plate: plate(j), wear, at: j.telemetry!.end });
 	}
 	const vehicles = [...latest.entries()].sort((a, b) => b[1].at - a[1].at);
 
