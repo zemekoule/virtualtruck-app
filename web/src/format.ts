@@ -38,6 +38,10 @@ export function gameFormat(data: GameData) {
 		city: name('cities'),
 		cargo: name('cargo'),
 		truck: name('trucks'),
+		vehicle: (truck: string | null, plate: string | null | undefined) => {
+			const model = name('trucks')(truck);
+			return model && plate ? `${model} (${plate})` : model;
+		},
 	};
 }
 

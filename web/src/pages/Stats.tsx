@@ -1,16 +1,30 @@
 import { fmt, percent, plural, useGame, wallTime } from '../format';
 import { UNFINISHED, WEAR } from '../jobText';
-import type { RecordedJob } from '../types';
+import type { Job, RecordedJob } from '../types';
 
-type Vehicle = { id: string; jobs: number; km: number; litres: number; capacity: number | null };
+type Vehicle = { truck: string; plate: string | null; jobs: number; km: number; litres: number; capacity: number | null };
+
+const vehicleKey = (truck: string, plate: string | null) => JSON.stringify([truck, plate]);
+
+// Jobs from plugins < 1.9.0 have no plate: a model with a single known plate is taken as that vehicle.
+function plateOf(jobs: Job[]) {
+	const plates = new Map<string, Set<string>>();
+	for (const j of jobs) if (j.truck && j.telemetry?.plate) plates.set(j.truck, (plates.get(j.truck) ?? new Set()).add(j.telemetry.plate));
+	return (j: Job) => {
+		const known = plates.get(j.truck ?? '');
+		return j.telemetry?.plate ?? (known?.size === 1 ? [...known][0] : null);
+	};
+}
 
 function vehicles(jobs: RecordedJob[]) {
+	const plate = plateOf(jobs);
 	const byId = new Map<string, Vehicle>();
 	for (const j of [...jobs].sort((a, b) => a.telemetry.end - b.telemetry.end)) {
 		const trace = j.telemetry.trace;
 		if (!j.truck) continue;
-		const v = byId.get(j.truck) ?? { id: j.truck, jobs: 0, km: 0, litres: 0, capacity: null };
-		byId.set(j.truck, v);
+		const key = vehicleKey(j.truck, plate(j));
+		const v = byId.get(key) ?? { truck: j.truck, plate: plate(j), jobs: 0, km: 0, litres: 0, capacity: null };
+		byId.set(key, v);
 		// The newest known tank wins: the vehicle may have been upgraded since.
 		v.capacity = j.telemetry.fuel_capacity ?? v.capacity;
 		if (UNFINISHED.includes(j.status) || !trace || trace.driven_km <= 0 || trace.fuel_used <= 0) continue;
@@ -37,8 +51,8 @@ function Range() {
 			{known.length > 0 && (
 				<ul className="hbars">
 					{known.map(v => (
-						<li key={v.id}>
-							<span className="hbar-label">{f.truck(v.id)}</span>
+						<li key={vehicleKey(v.truck, v.plate)}>
+							<span className="hbar-label">{f.vehicle(v.truck, v.plate)}</span>
 							<span className="hbar-track"><span className="hbar" style={{ width: `${range(v) / max * 100}%` }} /></span>
 							<b className="hbar-value">{f.dist(range(v))} <small>{f.units.distance}</small></b>
 							<span className="hbar-note muted">nádrž {f.volume(v.capacity!)} {f.units.volume}, spotřeba {note(v)}</span>
@@ -51,7 +65,7 @@ function Range() {
 					<h3>Objem nádrže zatím neznámý</h3>
 					<p className="muted">Plugin ho zapisuje od verze 1.8.0, stačí s vozem jednou vyjet.</p>
 					<ul className="plain-list">
-						{unknown.map(v => <li key={v.id}>{f.truck(v.id)} <span className="muted">– spotřeba {note(v)}</span></li>)}
+						{unknown.map(v => <li key={vehicleKey(v.truck, v.plate)}>{f.vehicle(v.truck, v.plate)} <span className="muted">– spotřeba {note(v)}</span></li>)}
 					</ul>
 				</>
 			)}
@@ -64,10 +78,13 @@ const PARTS = ['wear_wheels', 'wear_engine', 'wear_transmission', 'wear_chassis'
 
 function Wear() {
 	const { data, f } = useGame();
-	const latest = new Map<string, { wear: Record<string, number>; at: number }>();
+	const plate = plateOf(data.jobs);
+	const latest = new Map<string, { truck: string; plate: string | null; wear: Record<string, number>; at: number }>();
 	for (const j of data.jobs) {
 		const wear = j.telemetry?.trace?.wear_end;
-		if (j.truck && wear && j.telemetry!.end > (latest.get(j.truck)?.at ?? 0)) latest.set(j.truck, { wear, at: j.telemetry!.end });
+		if (!j.truck || !wear) continue;
+		const key = vehicleKey(j.truck, plate(j));
+		if (j.telemetry!.end > (latest.get(key)?.at ?? 0)) latest.set(key, { truck: j.truck, plate: plate(j), wear, at: j.telemetry!.end });
 	}
 	const vehicles = [...latest.entries()].sort((a, b) => b[1].at - a[1].at);
 
@@ -80,9 +97,9 @@ function Wear() {
 					<table className="wear">
 						<thead><tr><th>Vůz</th>{PARTS.map(p => <th key={p}>{WEAR[p][0].toUpperCase() + WEAR[p].slice(1)}</th>)}</tr></thead>
 						<tbody>
-							{vehicles.map(([id, { wear, at }]) => (
-								<tr key={id}>
-									<td><b>{f.truck(id)}</b><div className="sub">{wallTime(at, false)}</div></td>
+							{vehicles.map(([key, { truck, plate, wear, at }]) => (
+								<tr key={key}>
+									<td><b>{f.vehicle(truck, plate)}</b><div className="sub">{wallTime(at, false)}</div></td>
 									{PARTS.map(p => (
 										<td key={p}>
 											{wear[p] != null && <>

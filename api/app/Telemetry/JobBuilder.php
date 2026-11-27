@@ -254,6 +254,8 @@ class JobBuilder
                 'trailers' => $trailers,
                 // Plugin >= 1.8.0; litres.
                 'fuel_capacity' => $truck !== null && $truck !== [] ? self::get($truck, 'fuel.capacity') : null,
+                // Plugin >= 1.9.0; tells apart vehicles of the same model.
+                'plate' => $truck !== null && $truck !== [] ? self::plate($truck) : null,
                 'auto_park' => self::get($r, 'auto.park.used'),
                 'auto_load' => self::get($r, 'auto.load.used'),
                 'incidents' => array_map(fn ($i) => ['id' => $i['id'], 'attrs' => $i['attrs']], $incidents),
@@ -732,6 +734,16 @@ class JobBuilder
     private static function int(mixed $value): int
     {
         return is_numeric($value) ? (int) $value : 0;
+    }
+
+    /**
+     * @param  Row  $truck
+     */
+    private static function plate(array $truck): ?string
+    {
+        $plate = trim(self::str($truck['license.plate'] ?? null));
+
+        return $plate !== '' ? $plate : null;
     }
 
     private static function str(mixed $value): string

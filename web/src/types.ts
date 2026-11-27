@@ -60,6 +60,8 @@ export type Telemetry = {
 	vehicle_damage: number | null;
 	trailers: Trailer[];
 	fuel_capacity?: number | null;
+	// Plugin >= 1.9.0.
+	plate?: string | null;
 	auto_park: boolean | null;
 	auto_load: boolean | null;
 	incidents: { id: string; attrs: Record<string, string | number> }[];
