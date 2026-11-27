@@ -23,8 +23,9 @@ class JobComputation
 
     /**
      * @param  bool  $wait  wait for a computation running elsewhere instead of leaving the new data to it
+     * @param  bool  $fresh  compute the jobs and fuel prices from all data again (e.g. after fixing events by hand); needs $wait
      */
-    public function run(User $user, Game $game, bool $wait = false): void
+    public function run(User $user, Game $game, bool $wait = false, bool $fresh = false): void
     {
         do {
             // Events and trace come in separate requests; a request that finds the computation running leaves the new lines to it.
@@ -35,6 +36,11 @@ class JobComputation
                 return;
             }
             try {
+                // Under the lock, a computation running from an ingest request would otherwise save its state over the forgotten one.
+                if ($fresh) {
+                    $this->forget($user, $game);
+                    $fresh = false;
+                }
                 while ($this->computeNewData($user, $game)) {
                     // Lines may have arrived during the computation.
                 }
@@ -45,14 +51,12 @@ class JobComputation
         } while ($this->newData($user, $game) !== null);
     }
 
-    /**
-     * Forget the jobs computed from the plugin data, the next run computes them from all events again (e.g. after fixing events by hand).
-     */
-    public function forgetJobs(User $user, Game $game): void
+    private function forget(User $user, Game $game): void
     {
         DB::transaction(function () use ($user, $game) {
             DB::table('game_jobs')->where('user_id', $user->id)->where('game', $game->value)->where('source', 'plugin')->delete();
-            DB::table('job_computations')->where('user_id', $user->id)->where('game', $game->value)->update(['job_events_seq' => 0, 'job_state' => null, 'events_seq' => 0]);
+            DB::table('refuels')->where('user_id', $user->id)->where('game', $game->value)->delete();
+            DB::table('job_computations')->where('user_id', $user->id)->where('game', $game->value)->delete();
         });
     }
 

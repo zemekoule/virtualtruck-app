@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Telemetry;
 
 /**
- * Port of tank_prices() in page/build.py that goes through new trace points only.
+ * Port of tank_prices() in page/build.py that goes through new trace points only; unlike it, prices the fuel a vehicle starts with.
  *
  * @phpstan-type State array{tanks: array<string, array{litres: float|int, price: float|int|null}>, prev: array{wall: int, odometer: float|int, game_time: int|null}|null, refuel: array{wall: int, last_wall: int, vehicle: string, litres: float|int}|null}
  */
@@ -54,7 +54,8 @@ class TankPrices
             }
             $vehicle = $v['key'];
         }
-        $this->state['tanks'][$vehicle] ??= ['litres' => $p['fuel'], 'price' => null];
+        // A new vehicle comes with a full tank: its fuel is priced as if bought where the vehicle first drives.
+        $this->state['tanks'][$vehicle] ??= ['litres' => $p['fuel'], 'price' => $this->places !== [] ? $this->price($this->nearestPlace($p)[2], false) : null];
         $tank = $this->state['tanks'][$vehicle];
         $added = $p['fuel'] - $tank['litres'];
         $prev = $this->state['prev'];
@@ -63,10 +64,7 @@ class TankPrices
         if ($added >= self::REFUEL_MIN_L && $standing && $this->places !== []) {
             [$x, $z, $country, $garage] = $this->nearestPlace($p);
             if (($x - $p['x']) ** 2 + ($z - $p['z']) ** 2 <= self::REFUEL_PLACE_MAX_M ** 2) {
-                if (! isset($this->prices[$country])) {
-                    throw new \RuntimeException("No fuel price for {$country}, regenerate fuel_prices.json.");
-                }
-                $price = $this->prices[$country] * ($garage ? 1 - self::GARAGE_FUEL_DISCOUNT : 1);
+                $price = $this->price($country, $garage);
                 $old = $tank['price'] ?? $price;
                 $litres = max(0, $tank['litres']);
                 $tank['price'] = ($litres * $old + $added * $price) / ($litres + $added);
@@ -94,6 +92,15 @@ class TankPrices
         $this->state['prev'] = ['wall' => $p['wall'], 'odometer' => $p['odometer'], 'game_time' => $p['game_time']];
 
         return $tank['price'];
+    }
+
+    private function price(string $country, bool $garage): float|int
+    {
+        if (! isset($this->prices[$country])) {
+            throw new \RuntimeException("No fuel price for {$country}, regenerate fuel_prices.json.");
+        }
+
+        return $this->prices[$country] * ($garage ? 1 - self::GARAGE_FUEL_DISCOUNT : 1);
     }
 
     /**
